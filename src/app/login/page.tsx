@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
 import { AuthPageShell } from "@/components/auth/auth-page-shell";
 import { authService } from "@/lib/services/auth.service";
-import { ApiError } from "@/lib/exceptions/exceptions";
+import { ApiError } from "@/lib/exceptions/api-exceptions";
 import { apiClient } from "@/lib/api-client";
 import { AppUser } from "@/types/api-responses";
 import { getRoleHref } from "@/utils/roles";
