@@ -1,8 +1,8 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { cn } from "@/lib/utils"
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { cn } from "@/utils/cn";
 import {
   Home,
   Users,
@@ -13,20 +13,22 @@ import {
   BarChart3,
   Bell,
   LogOut,
-} from "lucide-react"
+} from "lucide-react";
 
 const navSections = [
   {
     title: "PRINCIPAL",
-    items: [
-      { href: "/admin", label: "Dashboard", icon: Home },
-    ],
+    items: [{ href: "/admin", label: "Dashboard", icon: Home }],
   },
   {
     title: "SUPERVISIÓN",
     items: [
       { href: "/admin/usuarios", label: "Usuarios", icon: Users },
-      { href: "/admin/verificaciones", label: "Verificaciones", icon: FileCheck },
+      {
+        href: "/admin/verificaciones",
+        label: "Verificaciones",
+        icon: FileCheck,
+      },
       { href: "/admin/propiedades", label: "Propiedades", icon: Building2 },
       { href: "/admin/reservas", label: "Reservas", icon: Calendar },
       { href: "/admin/mantenimiento", label: "Mantenimiento", icon: Wrench },
@@ -39,10 +41,10 @@ const navSections = [
       { href: "/admin/notificaciones", label: "Notificaciones", icon: Bell },
     ],
   },
-]
+];
 
 export function AdminSidebar() {
-  const pathname = usePathname()
+  const pathname = usePathname();
 
   return (
     <aside className="flex flex-col w-64 min-h-screen bg-card border-r border-border">
@@ -52,8 +54,12 @@ export function AdminSidebar() {
           <Home className="w-5 h-5 text-foreground" />
         </div>
         <div className="flex flex-col">
-          <span className="text-lg font-semibold italic text-foreground">RentFlow</span>
-          <span className="text-xs font-medium tracking-wider text-primary uppercase">Panel Admin</span>
+          <span className="text-lg font-semibold italic text-foreground">
+            RentFlow
+          </span>
+          <span className="text-xs font-medium tracking-wider text-primary uppercase">
+            Panel Admin
+          </span>
         </div>
       </div>
 
@@ -67,7 +73,9 @@ export function AdminSidebar() {
               </p>
               <div className="space-y-1">
                 {section.items.map((item) => {
-                  const isActive = pathname === item.href || (item.href !== "/admin" && pathname.startsWith(item.href))
+                  const isActive =
+                    pathname === item.href ||
+                    (item.href !== "/admin" && pathname.startsWith(item.href));
                   return (
                     <Link
                       key={item.href}
@@ -76,13 +84,15 @@ export function AdminSidebar() {
                         "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
                         isActive
                           ? "bg-primary/10 text-primary border border-primary/20"
-                          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground",
                       )}
                     >
-                      <item.icon className={cn("w-5 h-5", isActive && "text-primary")} />
+                      <item.icon
+                        className={cn("w-5 h-5", isActive && "text-primary")}
+                      />
                       {item.label}
                     </Link>
-                  )
+                  );
                 })}
               </div>
             </div>
@@ -98,5 +108,5 @@ export function AdminSidebar() {
         </button>
       </div>
     </aside>
-  )
+  );
 }

@@ -1,35 +1,41 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import Link from "next/link"
-import { Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react"
-import { demoUsers, getRoleHref } from "@/lib/auth-demo"
-import { AuthPageShell } from "@/components/auth/auth-page-shell"
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
+import { AuthPageShell } from "@/components/auth/auth-page-shell";
+import { authService } from "@/lib/services/auth.service";
+import { ApiError } from "@/lib/exceptions/exceptions";
+import { apiClient } from "@/lib/api-client";
+import { AppUser } from "@/types/api-responses";
+import { getRoleHref } from "@/utils/roles";
 
 export default function LoginPage() {
-  const router = useRouter()
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [showPassword, setShowPassword] = useState(false)
-  const [error, setError] = useState("")
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
 
-    const user = demoUsers.find(
-      (entry) => entry.email.trim().toLowerCase() === email.trim().toLowerCase() && entry.password === password
-    )
+    try {
+      const res = await authService.login(email, password);
+      apiClient.saveAuth(res.data); // Save token + user
+      const { user } = res.data;
 
-    if (!user) {
-      setError("Correo o contraseña incorrectos.")
-      return
+      setError("");
+      router.push(getRoleHref(user.role));
+    } catch (err: unknown) {
+      if (err instanceof ApiError && err.statusCode === 401) {
+        setError("Correo o contraseña incorrectos.");
+      } else {
+        setError("Error al iniciar sesión.");
+      }
     }
-
-    localStorage.setItem("rentflow-demo-user", JSON.stringify(user))
-    setError("")
-    router.push(getRoleHref(user.role))
-  }
+  };
 
   return (
     <AuthPageShell
@@ -84,7 +90,11 @@ export default function LoginPage() {
               onClick={() => setShowPassword(!showPassword)}
               className="text-muted-foreground hover:text-foreground transition-colors"
             >
-              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              {showPassword ? (
+                <EyeOff className="w-4 h-4" />
+              ) : (
+                <Eye className="w-4 h-4" />
+              )}
             </button>
           </div>
         </div>
@@ -100,5 +110,5 @@ export default function LoginPage() {
         </button>
       </form>
     </AuthPageShell>
-  )
+  );
 }

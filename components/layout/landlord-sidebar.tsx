@@ -1,8 +1,8 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { cn } from "@/lib/utils"
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { cn } from "@/utils/cn";
 import {
   Home,
   Building2,
@@ -17,7 +17,7 @@ import {
   LogOut,
   Key,
   DollarSign,
-} from "lucide-react"
+} from "lucide-react";
 
 const landlordSections = [
   {
@@ -27,29 +27,53 @@ const landlordSections = [
   {
     title: "Gestión",
     items: [
-      { href: "/propietario/propiedades", label: "Mis Propiedades", icon: Building2 },
+      {
+        href: "/propietario/propiedades",
+        label: "Mis Propiedades",
+        icon: Building2,
+      },
       { href: "/propietario/calendario", label: "Calendario", icon: Calendar },
       { href: "/propietario/reservas", label: "Reservas", icon: FileText },
       { href: "/propietario/contratos", label: "Contratos", icon: FileText },
-      { href: "/propietario/mantenimiento", label: "Mantenimiento", icon: Wrench },
-      { href: "/propietario/codigos-acceso", label: "Códigos de Acceso", icon: Key },
+      {
+        href: "/propietario/mantenimiento",
+        label: "Mantenimiento",
+        icon: Wrench,
+      },
+      {
+        href: "/propietario/codigos-acceso",
+        label: "Códigos de Acceso",
+        icon: Key,
+      },
       { href: "/propietario/multas", label: "Multas", icon: DollarSign },
-      { href: "/propietario/calificaciones", label: "Calificaciones", icon: Star },
+      {
+        href: "/propietario/calificaciones",
+        label: "Calificaciones",
+        icon: Star,
+      },
       { href: "/propietario/reportes", label: "Reportes", icon: BarChart3 },
-      { href: "/propietario/notificaciones", label: "Notificaciones", icon: Bell },
+      {
+        href: "/propietario/notificaciones",
+        label: "Notificaciones",
+        icon: Bell,
+      },
     ],
   },
   {
     title: "Mi cuenta",
     items: [
       { href: "/propietario/perfil", label: "Mi Perfil", icon: User },
-      { href: "/propietario/configuracion", label: "Configuración", icon: Settings },
+      {
+        href: "/propietario/configuracion",
+        label: "Configuración",
+        icon: Settings,
+      },
     ],
   },
-]
+];
 
 export function LandlordSidebar() {
-  const pathname = usePathname()
+  const pathname = usePathname();
 
   return (
     <aside className="flex flex-col w-64 min-h-screen bg-card border-r border-border">
@@ -59,7 +83,9 @@ export function LandlordSidebar() {
           <Home className="w-5 h-5 text-foreground" />
         </div>
         <div className="flex flex-col">
-          <span className="font-serif text-lg font-semibold italic text-foreground">RentFlow</span>
+          <span className="font-serif text-lg font-semibold italic text-foreground">
+            RentFlow
+          </span>
           <span className="ml-1 text-[10px] font-medium uppercase tracking-wider text-primary">
             Hogares de Autor
           </span>
@@ -77,7 +103,8 @@ export function LandlordSidebar() {
               const isActive =
                 item.href === "/propietario"
                   ? pathname === item.href
-                  : pathname === item.href || pathname.startsWith(`${item.href}/`)
+                  : pathname === item.href ||
+                    pathname.startsWith(`${item.href}/`);
 
               return (
                 <Link
@@ -87,13 +114,13 @@ export function LandlordSidebar() {
                     "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
                     isActive
                       ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
                   )}
                 >
                   <item.icon className="w-5 h-5" />
                   {item.label}
                 </Link>
-              )
+              );
             })}
           </div>
         ))}
@@ -106,5 +133,5 @@ export function LandlordSidebar() {
         </button>
       </div>
     </aside>
-  )
+  );
 }

@@ -1,83 +1,119 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog'
-import { Calendar } from '@/components/ui/calendar'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Label } from '@/components/ui/label'
-import { 
-  Home, 
-  MapPin, 
-  CalendarDays, 
-  Clock, 
-  Users, 
-  CreditCard, 
-  Key, 
-  FileText, 
-  ChevronRight, 
+import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import {
+  Home,
+  MapPin,
+  CalendarDays,
+  Clock,
+  Users,
+  CreditCard,
+  Key,
+  FileText,
+  ChevronRight,
   CalendarIcon,
   AlertTriangle,
-  Star
-} from 'lucide-react'
-import { mockReservations, type Reservation } from '@/lib/mock-data'
-import { cn } from '@/lib/utils'
-import { format, addDays } from 'date-fns'
-import { es } from 'date-fns/locale'
+  Star,
+} from "lucide-react";
+import { mockReservations, type Reservation } from "@/lib/mock-data";
+import { cn } from "@/utils/cn";
+import { format, addDays } from "date-fns";
+import { es } from "date-fns/locale";
 
 const statusColors = {
-  reserved: 'bg-blue-100 text-blue-800',
-  active: 'bg-green-100 text-green-800',
-  completed: 'bg-gray-100 text-gray-800',
-  cancelled: 'bg-red-100 text-red-800',
-}
+  reserved: "bg-blue-100 text-blue-800",
+  active: "bg-green-100 text-green-800",
+  completed: "bg-gray-100 text-gray-800",
+  cancelled: "bg-red-100 text-red-800",
+};
 
 const statusLabels = {
-  reserved: 'Reservada',
-  active: 'En Curso',
-  completed: 'Completada',
-  cancelled: 'Cancelada',
-}
+  reserved: "Reservada",
+  active: "En Curso",
+  completed: "Completada",
+  cancelled: "Cancelada",
+};
 
 export default function ReservationsPage() {
-  const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null)
-  const [showExtendDialog, setShowExtendDialog] = useState(false)
-  const [showCancelDialog, setShowCancelDialog] = useState(false)
-  const [newCheckoutDate, setNewCheckoutDate] = useState<Date | undefined>()
+  const [selectedReservation, setSelectedReservation] =
+    useState<Reservation | null>(null);
+  const [showExtendDialog, setShowExtendDialog] = useState(false);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [newCheckoutDate, setNewCheckoutDate] = useState<Date | undefined>();
 
   const activeReservations = mockReservations.filter(
-    r => r.reservationStatus === 'active' || r.reservationStatus === 'reserved'
-  )
+    (r) =>
+      r.reservationStatus === "active" || r.reservationStatus === "reserved",
+  );
   const completedReservations = mockReservations.filter(
-    r => r.reservationStatus === 'completed'
-  )
+    (r) => r.reservationStatus === "completed",
+  );
   const cancelledReservations = mockReservations.filter(
-    r => r.reservationStatus === 'cancelled'
-  )
+    (r) => r.reservationStatus === "cancelled",
+  );
 
   const calculateExtensionCost = (reservation: Reservation, newDate: Date) => {
-    const currentCheckout = new Date(reservation.checkOutDate)
-    const additionalNights = Math.ceil((newDate.getTime() - currentCheckout.getTime()) / (1000 * 60 * 60 * 24))
-    return additionalNights * reservation.property.basePricePerNight
-  }
+    const currentCheckout = new Date(reservation.checkOutDate);
+    const additionalNights = Math.ceil(
+      (newDate.getTime() - currentCheckout.getTime()) / (1000 * 60 * 60 * 24),
+    );
+    return additionalNights * reservation.property.basePricePerNight;
+  };
 
   const calculateCancellationPenalty = (reservation: Reservation) => {
-    const checkIn = new Date(reservation.checkInDate)
-    const today = new Date()
-    const daysUntilCheckin = Math.ceil((checkIn.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-    
+    const checkIn = new Date(reservation.checkInDate);
+    const today = new Date();
+    const daysUntilCheckin = Math.ceil(
+      (checkIn.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
+    );
+
     if (daysUntilCheckin >= 7) {
-      return { penalty: 0, refund: reservation.baseTotal, message: 'Reembolso completo del 100%' }
+      return {
+        penalty: 0,
+        refund: reservation.baseTotal,
+        message: "Reembolso completo del 100%",
+      };
     } else if (daysUntilCheckin >= 3) {
-      return { penalty: reservation.baseTotal * 0.5, refund: reservation.baseTotal * 0.5, message: 'Penalización del 50%' }
+      return {
+        penalty: reservation.baseTotal * 0.5,
+        refund: reservation.baseTotal * 0.5,
+        message: "Penalización del 50%",
+      };
     } else {
-      return { penalty: reservation.baseTotal, refund: 0, message: 'Sin reembolso (menos de 3 días)' }
+      return {
+        penalty: reservation.baseTotal,
+        refund: 0,
+        message: "Sin reembolso (menos de 3 días)",
+      };
     }
-  }
+  };
 
   const ReservationCard = ({ reservation }: { reservation: Reservation }) => (
     <Card className="overflow-hidden">
@@ -109,11 +145,14 @@ export default function ReservationsPage() {
               <div>
                 <p className="text-xs text-muted-foreground">Check-in</p>
                 <p className="font-medium">
-                  {new Date(reservation.checkInDate).toLocaleDateString('es-ES', {
-                    day: 'numeric',
-                    month: 'short',
-                    year: 'numeric'
-                  })}
+                  {new Date(reservation.checkInDate).toLocaleDateString(
+                    "es-ES",
+                    {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    },
+                  )}
                 </p>
               </div>
             </div>
@@ -122,11 +161,14 @@ export default function ReservationsPage() {
               <div>
                 <p className="text-xs text-muted-foreground">Check-out</p>
                 <p className="font-medium">
-                  {new Date(reservation.checkOutDate).toLocaleDateString('es-ES', {
-                    day: 'numeric',
-                    month: 'short',
-                    year: 'numeric'
-                  })}
+                  {new Date(reservation.checkOutDate).toLocaleDateString(
+                    "es-ES",
+                    {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    },
+                  )}
                 </p>
               </div>
             </div>
@@ -141,7 +183,9 @@ export default function ReservationsPage() {
               <CreditCard className="h-4 w-4 text-muted-foreground" />
               <div>
                 <p className="text-xs text-muted-foreground">Total</p>
-                <p className="font-medium text-primary">${reservation.totalPrice.toFixed(2)}</p>
+                <p className="font-medium text-primary">
+                  ${reservation.totalPrice.toFixed(2)}
+                </p>
               </div>
             </div>
           </div>
@@ -149,8 +193,8 @@ export default function ReservationsPage() {
           <div className="mt-4 flex flex-wrap gap-2">
             <Dialog>
               <DialogTrigger asChild>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   onClick={() => setSelectedReservation(reservation)}
                 >
@@ -166,10 +210,15 @@ export default function ReservationsPage() {
                 </DialogHeader>
                 <div className="space-y-4">
                   <div className="rounded-lg bg-secondary p-4">
-                    <h4 className="font-semibold">Información de la Propiedad</h4>
-                    <p className="mt-1 text-sm text-muted-foreground">{reservation.property.address}</p>
+                    <h4 className="font-semibold">
+                      Información de la Propiedad
+                    </h4>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {reservation.property.address}
+                    </p>
                     <p className="text-sm text-muted-foreground">
-                      {reservation.property.city}, {reservation.property.department}
+                      {reservation.property.city},{" "}
+                      {reservation.property.department}
                     </p>
                   </div>
 
@@ -177,23 +226,29 @@ export default function ReservationsPage() {
                     <div>
                       <p className="text-xs text-muted-foreground">Check-in</p>
                       <p className="font-medium">
-                        {new Date(reservation.checkInDate).toLocaleDateString('es-ES', {
-                          weekday: 'long',
-                          day: 'numeric',
-                          month: 'long',
-                          year: 'numeric'
-                        })}
+                        {new Date(reservation.checkInDate).toLocaleDateString(
+                          "es-ES",
+                          {
+                            weekday: "long",
+                            day: "numeric",
+                            month: "long",
+                            year: "numeric",
+                          },
+                        )}
                       </p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Check-out</p>
                       <p className="font-medium">
-                        {new Date(reservation.checkOutDate).toLocaleDateString('es-ES', {
-                          weekday: 'long',
-                          day: 'numeric',
-                          month: 'long',
-                          year: 'numeric'
-                        })}
+                        {new Date(reservation.checkOutDate).toLocaleDateString(
+                          "es-ES",
+                          {
+                            weekday: "long",
+                            day: "numeric",
+                            month: "long",
+                            year: "numeric",
+                          },
+                        )}
                       </p>
                     </div>
                   </div>
@@ -202,7 +257,10 @@ export default function ReservationsPage() {
                     <h4 className="font-semibold">Desglose de Precios</h4>
                     <div className="mt-2 space-y-1 text-sm">
                       <div className="flex justify-between">
-                        <span>${reservation.property.basePricePerNight} x {reservation.totalNights} noches</span>
+                        <span>
+                          ${reservation.property.basePricePerNight} x{" "}
+                          {reservation.totalNights} noches
+                        </span>
                         <span>${reservation.baseTotal.toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between">
@@ -212,59 +270,75 @@ export default function ReservationsPage() {
                       {reservation.longStayDiscount > 0 && (
                         <div className="flex justify-between text-green-600">
                           <span>Descuento estadía larga</span>
-                          <span>-${reservation.longStayDiscount.toFixed(2)}</span>
+                          <span>
+                            -${reservation.longStayDiscount.toFixed(2)}
+                          </span>
                         </div>
                       )}
                       <div className="flex justify-between">
                         <span>Depósito de garantía</span>
-                        <span>${reservation.property.securityDepositAmount.toFixed(2)}</span>
+                        <span>
+                          $
+                          {reservation.property.securityDepositAmount.toFixed(
+                            2,
+                          )}
+                        </span>
                       </div>
                       <div className="mt-2 flex justify-between border-t border-border pt-2 font-bold">
                         <span>Total</span>
-                        <span className="text-primary">${reservation.totalPrice.toFixed(2)}</span>
+                        <span className="text-primary">
+                          ${reservation.totalPrice.toFixed(2)}
+                        </span>
                       </div>
                     </div>
                   </div>
 
-                  {reservation.accessCode && (reservation.reservationStatus === 'active' || reservation.reservationStatus === 'reserved') && (
-                    <div className="flex items-center justify-between rounded-lg bg-primary/10 p-4">
-                      <div className="flex items-center gap-3">
-                        <Key className="h-6 w-6 text-primary" />
-                        <div>
-                          <p className="text-xs text-muted-foreground">Código de Acceso</p>
-                          <p className="font-mono text-lg font-bold">{reservation.accessCode}</p>
+                  {reservation.accessCode &&
+                    (reservation.reservationStatus === "active" ||
+                      reservation.reservationStatus === "reserved") && (
+                      <div className="flex items-center justify-between rounded-lg bg-primary/10 p-4">
+                        <div className="flex items-center gap-3">
+                          <Key className="h-6 w-6 text-primary" />
+                          <div>
+                            <p className="text-xs text-muted-foreground">
+                              Código de Acceso
+                            </p>
+                            <p className="font-mono text-lg font-bold">
+                              {reservation.accessCode}
+                            </p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    )}
                 </div>
               </DialogContent>
             </Dialog>
 
-            {(reservation.reservationStatus === 'active' || reservation.reservationStatus === 'reserved') && (
+            {(reservation.reservationStatus === "active" ||
+              reservation.reservationStatus === "reserved") && (
               <>
                 {reservation.accessCode && (
                   <Button variant="outline" size="sm">
                     <Key className="mr-1 h-4 w-4" /> {reservation.accessCode}
                   </Button>
                 )}
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   onClick={() => {
-                    setSelectedReservation(reservation)
-                    setShowExtendDialog(true)
+                    setSelectedReservation(reservation);
+                    setShowExtendDialog(true);
                   }}
                 >
                   Extender
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   className="text-destructive hover:bg-destructive hover:text-destructive-foreground"
                   onClick={() => {
-                    setSelectedReservation(reservation)
-                    setShowCancelDialog(true)
+                    setSelectedReservation(reservation);
+                    setShowCancelDialog(true);
                   }}
                 >
                   Cancelar
@@ -272,7 +346,7 @@ export default function ReservationsPage() {
               </>
             )}
 
-            {reservation.reservationStatus === 'completed' && (
+            {reservation.reservationStatus === "completed" && (
               <Button variant="outline" size="sm">
                 <Star className="mr-1 h-4 w-4" /> Calificar
               </Button>
@@ -281,13 +355,15 @@ export default function ReservationsPage() {
         </div>
       </div>
     </Card>
-  )
+  );
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Mis Reservas</h1>
-        <p className="text-muted-foreground">Gestiona todas tus reservas en RentFlow</p>
+        <p className="text-muted-foreground">
+          Gestiona todas tus reservas en RentFlow
+        </p>
       </div>
 
       <Tabs defaultValue="active" className="w-full">
@@ -308,8 +384,12 @@ export default function ReservationsPage() {
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <Home className="mb-4 h-12 w-12 text-muted-foreground/50" />
-                <h3 className="text-lg font-semibold">No tienes reservas activas</h3>
-                <p className="text-muted-foreground">Busca propiedades para hacer tu próxima reserva</p>
+                <h3 className="text-lg font-semibold">
+                  No tienes reservas activas
+                </h3>
+                <p className="text-muted-foreground">
+                  Busca propiedades para hacer tu próxima reserva
+                </p>
               </CardContent>
             </Card>
           ) : (
@@ -324,8 +404,12 @@ export default function ReservationsPage() {
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <FileText className="mb-4 h-12 w-12 text-muted-foreground/50" />
-                <h3 className="text-lg font-semibold">No tienes reservas completadas</h3>
-                <p className="text-muted-foreground">Tus reservas pasadas aparecerán aquí</p>
+                <h3 className="text-lg font-semibold">
+                  No tienes reservas completadas
+                </h3>
+                <p className="text-muted-foreground">
+                  Tus reservas pasadas aparecerán aquí
+                </p>
               </CardContent>
             </Card>
           ) : (
@@ -340,8 +424,12 @@ export default function ReservationsPage() {
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <AlertTriangle className="mb-4 h-12 w-12 text-muted-foreground/50" />
-                <h3 className="text-lg font-semibold">No tienes reservas canceladas</h3>
-                <p className="text-muted-foreground">Las reservas canceladas aparecerán aquí</p>
+                <h3 className="text-lg font-semibold">
+                  No tienes reservas canceladas
+                </h3>
+                <p className="text-muted-foreground">
+                  Las reservas canceladas aparecerán aquí
+                </p>
               </CardContent>
             </Card>
           ) : (
@@ -368,11 +456,13 @@ export default function ReservationsPage() {
                   Fecha actual de check-out
                 </Label>
                 <p className="mt-1 font-medium">
-                  {new Date(selectedReservation.checkOutDate).toLocaleDateString('es-ES', {
-                    weekday: 'long',
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric'
+                  {new Date(
+                    selectedReservation.checkOutDate,
+                  ).toLocaleDateString("es-ES", {
+                    weekday: "long",
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
                   })}
                 </p>
               </div>
@@ -386,12 +476,14 @@ export default function ReservationsPage() {
                     <Button
                       variant="outline"
                       className={cn(
-                        'mt-1 w-full justify-start text-left font-normal',
-                        !newCheckoutDate && 'text-muted-foreground'
+                        "mt-1 w-full justify-start text-left font-normal",
+                        !newCheckoutDate && "text-muted-foreground",
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {newCheckoutDate ? format(newCheckoutDate, 'PPP', { locale: es }) : 'Selecciona fecha'}
+                      {newCheckoutDate
+                        ? format(newCheckoutDate, "PPP", { locale: es })
+                        : "Selecciona fecha"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
@@ -399,7 +491,9 @@ export default function ReservationsPage() {
                       mode="single"
                       selected={newCheckoutDate}
                       onSelect={setNewCheckoutDate}
-                      disabled={(date) => date <= new Date(selectedReservation.checkOutDate)}
+                      disabled={(date) =>
+                        date <= new Date(selectedReservation.checkOutDate)
+                      }
                     />
                   </PopoverContent>
                 </Popover>
@@ -414,8 +508,12 @@ export default function ReservationsPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="card">Tarjeta de Crédito/Débito</SelectItem>
-                    <SelectItem value="transfer">Transferencia Bancaria</SelectItem>
+                    <SelectItem value="card">
+                      Tarjeta de Crédito/Débito
+                    </SelectItem>
+                    <SelectItem value="transfer">
+                      Transferencia Bancaria
+                    </SelectItem>
                     <SelectItem value="cash">Efectivo</SelectItem>
                   </SelectContent>
                 </Select>
@@ -425,22 +523,33 @@ export default function ReservationsPage() {
                 <div className="rounded-lg bg-secondary p-4">
                   <h4 className="font-semibold">Costo de Extensión</h4>
                   <p className="mt-2 text-2xl font-bold text-primary">
-                    ${calculateExtensionCost(selectedReservation, newCheckoutDate).toFixed(2)}
+                    $
+                    {calculateExtensionCost(
+                      selectedReservation,
+                      newCheckoutDate,
+                    ).toFixed(2)}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {Math.ceil((newCheckoutDate.getTime() - new Date(selectedReservation.checkOutDate).getTime()) / (1000 * 60 * 60 * 24))} noches adicionales × ${selectedReservation.property.basePricePerNight}/noche
+                    {Math.ceil(
+                      (newCheckoutDate.getTime() -
+                        new Date(selectedReservation.checkOutDate).getTime()) /
+                        (1000 * 60 * 60 * 24),
+                    )}{" "}
+                    noches adicionales × $
+                    {selectedReservation.property.basePricePerNight}/noche
                   </p>
                 </div>
               )}
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowExtendDialog(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setShowExtendDialog(false)}
+            >
               Cancelar
             </Button>
-            <Button disabled={!newCheckoutDate}>
-              Confirmar Extensión
-            </Button>
+            <Button disabled={!newCheckoutDate}>Confirmar Extensión</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -460,32 +569,46 @@ export default function ReservationsPage() {
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="h-5 w-5 text-amber-600" />
                   <div>
-                    <h4 className="font-semibold text-amber-800">Política de Cancelación</h4>
+                    <h4 className="font-semibold text-amber-800">
+                      Política de Cancelación
+                    </h4>
                     {(() => {
-                      const penalty = calculateCancellationPenalty(selectedReservation)
+                      const penalty =
+                        calculateCancellationPenalty(selectedReservation);
                       return (
                         <div className="mt-2 text-sm text-amber-700">
                           <p>{penalty.message}</p>
                           <div className="mt-2 space-y-1">
                             <div className="flex justify-between">
                               <span>Penalización:</span>
-                              <span className="font-medium">${penalty.penalty.toFixed(2)}</span>
+                              <span className="font-medium">
+                                ${penalty.penalty.toFixed(2)}
+                              </span>
                             </div>
                             <div className="flex justify-between">
                               <span>Reembolso base:</span>
-                              <span className="font-medium">${penalty.refund.toFixed(2)}</span>
+                              <span className="font-medium">
+                                ${penalty.refund.toFixed(2)}
+                              </span>
                             </div>
                             <div className="flex justify-between">
                               <span>Tarifa limpieza (reembolsable):</span>
-                              <span className="font-medium">${selectedReservation.cleaningFee.toFixed(2)}</span>
+                              <span className="font-medium">
+                                ${selectedReservation.cleaningFee.toFixed(2)}
+                              </span>
                             </div>
                             <div className="flex justify-between">
                               <span>Depósito (reembolsable):</span>
-                              <span className="font-medium">${selectedReservation.property.securityDepositAmount.toFixed(2)}</span>
+                              <span className="font-medium">
+                                $
+                                {selectedReservation.property.securityDepositAmount.toFixed(
+                                  2,
+                                )}
+                              </span>
                             </div>
                           </div>
                         </div>
-                      )
+                      );
                     })()}
                   </div>
                 </div>
@@ -493,23 +616,32 @@ export default function ReservationsPage() {
 
               <div className="rounded-lg bg-secondary p-4">
                 <h4 className="font-semibold">Propiedad</h4>
-                <p className="text-sm text-muted-foreground">{selectedReservation.property.title}</p>
+                <p className="text-sm text-muted-foreground">
+                  {selectedReservation.property.title}
+                </p>
                 <p className="mt-2 text-sm">
-                  {new Date(selectedReservation.checkInDate).toLocaleDateString('es-ES')} - {new Date(selectedReservation.checkOutDate).toLocaleDateString('es-ES')}
+                  {new Date(selectedReservation.checkInDate).toLocaleDateString(
+                    "es-ES",
+                  )}{" "}
+                  -{" "}
+                  {new Date(
+                    selectedReservation.checkOutDate,
+                  ).toLocaleDateString("es-ES")}
                 </p>
               </div>
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCancelDialog(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setShowCancelDialog(false)}
+            >
               Volver
             </Button>
-            <Button variant="destructive">
-              Confirmar Cancelación
-            </Button>
+            <Button variant="destructive">Confirmar Cancelación</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }
