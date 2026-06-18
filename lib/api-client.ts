@@ -1,14 +1,15 @@
 import { AppUser, Auth } from "@/types/api-responses";
 import { ApiError } from "./exceptions/api-exceptions";
+import { localStorageService } from "./services/local-storage.service";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 function getToken(): string | null {
   if (typeof window === "undefined") return null;
-  const raw = localStorage.getItem("auth");
-  if (!raw) return null;
+  const savedAuth = localStorageService.get("auth") as Auth | null;
+  if (!savedAuth) return null;
   try {
-    return JSON.parse(raw).token ?? null;
+    return savedAuth.token ?? null;
   } catch {
     return null;
   }
@@ -16,7 +17,7 @@ function getToken(): string | null {
 
 function saveAuth(auth: Auth): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem("auth", JSON.stringify(auth));
+  localStorageService.save("auth", auth);
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
