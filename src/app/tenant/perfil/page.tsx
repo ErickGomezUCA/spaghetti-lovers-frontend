@@ -59,8 +59,7 @@ export default function ProfilePage() {
                   </Badge>
                 )}
               </div>
-              <p className="text-muted-foreground">Inquilino desde TODO</p>
-              {/* TODO: Fetch createdAt field */}
+              <p className="text-muted-foreground">Inquilino</p>
               <div className="mt-2 flex items-center justify-center gap-4 md:justify-start">
                 <div className="flex items-center gap-1">
                   <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
