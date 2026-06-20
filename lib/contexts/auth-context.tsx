@@ -39,7 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Get auth from localStorage on mount
+  // TODO: Fetch user from /me instead of saved auth
   useEffect(() => {
     const savedAuth = authClient.getAuth();
     if (savedAuth) {
@@ -48,6 +48,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setIsLoading(false);
   }, []);
+
+  // useEffect(() => {
+  //   const fetchUser = async () => {
+  //     try {
+  //       const res = await userService.me();
+  //       console.log(res);
+  //       const auth = res.data;
+  //       setUser(auth.user);
+  //       setToken(auth.token);
+  //       console.log("Fetched user info:", auth.user);
+  //     } catch (error) {
+  //       console.error("Failed to fetch user info:", error);
+  //       authClient.clearAuth();
+  //       setUser(null);
+  //       setToken(null);
+  //     } finally {
+  //       setIsLoading(false);
+  //     }
+  //   };
+
+  //   fetchUser();
+  // }, []);
 
   const applyAuth = (auth: Auth) => {
     authClient.saveAuth(auth);

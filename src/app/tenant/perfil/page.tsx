@@ -150,10 +150,7 @@ export default function ProfilePage() {
                 </p>
                 <p className="text-xs text-muted-foreground">Completadas</p>
               </div>
-              <div
-                className="rounded-lg bg-seconda
-        onOpenChange={setShowEditDialog}ry p-4 text-center"
-              >
+              <div className="rounded-lg bg-secondary p-4 text-center">
                 <Star className="mx-auto h-6 w-6 text-amber-500" />
                 <p className="mt-2 text-2xl font-bold">
                   {/* TODO: Implement average rating {user?.averageRating} */}

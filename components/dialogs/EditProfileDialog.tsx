@@ -18,6 +18,7 @@ import { UpdateProfileFormData } from "@/types/forms";
 import { formatPhone, validateProfileUpdate } from "@/lib/validators/users";
 import { userService } from "@/lib/services/user.service";
 import { cn } from "@/utils/cn";
+import { authClient } from "@/lib/clients/auth-client";
 
 interface EditProfileDialogProps {
   open: boolean;
@@ -67,7 +68,7 @@ const EditProfileDialog = ({ open, onOpenChange }: EditProfileDialogProps) => {
       setErrors((prev) => prev.filter((err) => err.field !== field));
     };
 
-  const submitEditForm = (event: React.FormEvent<HTMLFormElement>) => {
+  const submitEditForm = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSubmitError("");
 
@@ -79,13 +80,20 @@ const EditProfileDialog = ({ open, onOpenChange }: EditProfileDialogProps) => {
 
     setIsLoading(true);
     try {
-      userService.update({
+      const updatedUser = await userService.update({
         name: editFormData.name,
         email: editFormData.email,
         phone: editFormData.phone,
       });
 
-      // TODO: reload page
+      // Update auth saved on context
+      authClient.saveAuth({
+        token: authClient.getAuth()?.token ?? "",
+        user: updatedUser.data,
+      });
+
+      // TODO: dialog to confirm reload
+      window.location.reload();
     } catch (err: unknown) {
       console.error("Update error:", err);
     } finally {

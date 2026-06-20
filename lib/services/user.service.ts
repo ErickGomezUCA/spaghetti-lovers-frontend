@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/clients/api-client";
-import { ApiResponse, Auth } from "@/types/api-responses";
+import { ApiResponse, AppUser, Auth } from "@/types/api-responses";
 import { RegisterRequest, UpdateProfileRequest } from "./user.dto";
 
 export const userService = {
@@ -13,5 +13,7 @@ export const userService = {
     apiClient.post<ApiResponse<Auth>>("/users/register", data),
 
   update: (data: UpdateProfileRequest) =>
-    apiClient.put<ApiResponse<Auth>>("/users/update", data),
+    apiClient.put<ApiResponse<AppUser>>("/users/update", data),
+
+  me: () => apiClient.get<ApiResponse<AppUser>>("/users/me"),
 };
