@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,16 +29,16 @@ import {
 } from "lucide-react";
 import { mockReservations, mockIdentityDocument } from "@/lib/mock-data";
 import { useAuth } from "@/lib/contexts/auth-context";
+import { ValidationError } from "next/dist/compiled/amphtml-validator";
+import { UpdateProfileFormData } from "@/types/forms";
+import { formatPhone, validateProfileUpdate } from "@/lib/validators/users";
+import { userService } from "@/lib/services/user.service";
+import EditProfileDialog from "@/components/dialogs/EditProfileDialog";
 
 export default function ProfilePage() {
   const { user } = useAuth();
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
-  const [editForm, setEditForm] = useState({
-    name: user?.name,
-    email: user?.email,
-    phone: user?.phone,
-  });
 
   const totalReservations = mockReservations.length;
   const completedReservations = mockReservations.filter(
@@ -150,7 +150,10 @@ export default function ProfilePage() {
                 </p>
                 <p className="text-xs text-muted-foreground">Completadas</p>
               </div>
-              <div className="rounded-lg bg-secondary p-4 text-center">
+              <div
+                className="rounded-lg bg-seconda
+        onOpenChange={setShowEditDialog}ry p-4 text-center"
+              >
                 <Star className="mx-auto h-6 w-6 text-amber-500" />
                 <p className="mt-2 text-2xl font-bold">
                   {/* TODO: Implement average rating {user?.averageRating} */}
@@ -263,61 +266,10 @@ export default function ProfilePage() {
       </div>
 
       {/* Edit Profile Dialog */}
-      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Editar Perfil</DialogTitle>
-            <DialogDescription>
-              Actualiza tu información personal
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Nombre Completo
-              </Label>
-              <Input
-                className="mt-1"
-                value={editForm.name}
-                onChange={(e) =>
-                  setEditForm({ ...editForm, name: e.target.value })
-                }
-              />
-            </div>
-            <div>
-              <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Correo Electrónico
-              </Label>
-              <Input
-                className="mt-1"
-                type="email"
-                value={editForm.email}
-                onChange={(e) =>
-                  setEditForm({ ...editForm, email: e.target.value })
-                }
-              />
-            </div>
-            <div>
-              <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Teléfono de Contacto
-              </Label>
-              <Input
-                className="mt-1"
-                value={editForm.phone}
-                onChange={(e) =>
-                  setEditForm({ ...editForm, phone: e.target.value })
-                }
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEditDialog(false)}>
-              Cancelar
-            </Button>
-            <Button>Guardar Cambios</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <EditProfileDialog
+        open={showEditDialog}
+        onOpenChange={setShowEditDialog}
+      />
 
       {/* Change Password Dialog */}
       <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>

@@ -8,7 +8,7 @@ import {
   ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
-import { authService } from "@/lib/services/auth.service";
+import { userService } from "@/lib/services/user.service";
 import { AppUser, Auth, UserRole } from "@/types/api-responses";
 import { authClient } from "../clients/auth-client";
 
@@ -57,12 +57,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const login = async (email: string, password: string) => {
-    const res = await authService.login(email, password);
+    const res = await userService.login(email, password);
     return applyAuth(res.data);
   };
 
   const register = async (data: RegisterPayload) => {
-    const res = await authService.register(data);
+    const res = await userService.register(data);
     return applyAuth(res.data);
   };
 

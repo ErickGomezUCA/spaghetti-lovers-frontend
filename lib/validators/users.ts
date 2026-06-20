@@ -1,3 +1,5 @@
+import { RegisterRequest, UpdateProfileRequest } from "../services/user.dto";
+
 export interface ValidationError {
   field: string;
   message: string;
@@ -60,12 +62,9 @@ export const getPasswordRequirements = (password: string) => {
 };
 
 // Validate registration form
-export const validateRegistration = (data: {
-  name: string;
-  email: string;
-  phone: string;
-  password: string;
-}): RegisterValidationResult => {
+export const validateRegistration = (
+  data: Omit<RegisterRequest, "role">,
+): RegisterValidationResult => {
   const errors: ValidationError[] = [];
 
   if (!data.name.trim()) {
@@ -78,7 +77,7 @@ export const validateRegistration = (data: {
     errors.push({ field: "email", message: "Formato de correo inválido" });
   }
 
-  if (!data.phone.trim()) {
+  if (!data.phone?.trim()) {
     errors.push({ field: "phone", message: "El teléfono es requerido" });
   } else if (!validatePhone(data.phone)) {
     errors.push({
@@ -94,6 +93,36 @@ export const validateRegistration = (data: {
       field: "password",
       message:
         "Mínimo 12 caracteres, una mayúscula, un número y un carácter especial",
+    });
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+  };
+};
+
+export const validateProfileUpdate = (
+  data: UpdateProfileRequest,
+): RegisterValidationResult => {
+  const errors: ValidationError[] = [];
+
+  if (!data.name.trim()) {
+    errors.push({ field: "name", message: "El nombre es requerido" });
+  }
+
+  if (!data.email.trim()) {
+    errors.push({ field: "email", message: "El correo es requerido" });
+  } else if (!validateEmail(data.email)) {
+    errors.push({ field: "email", message: "Formato de correo inválido" });
+  }
+
+  if (!data.phone?.trim()) {
+    errors.push({ field: "phone", message: "El teléfono es requerido" });
+  } else if (!validatePhone(data.phone)) {
+    errors.push({
+      field: "phone",
+      message: "Formato: +503 1234-5678",
     });
   }
 

@@ -8,7 +8,7 @@ import {
   validateRegistration,
   formatPhone,
   ValidationError,
-} from "@/lib/validators/auth";
+} from "@/lib/validators/users";
 import { RegisterFormData } from "@/types/forms";
 import { getRoleHref } from "@/utils/roles";
 import { cn } from "@/utils/cn";
@@ -72,7 +72,7 @@ export default function RegisterPage() {
       });
       router.push(getRoleHref(user.role));
     } catch (err: unknown) {
-      // ...unchanged catch block
+      console.error("Registration error:", err);
     } finally {
       setIsLoading(false);
     }

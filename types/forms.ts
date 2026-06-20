@@ -4,3 +4,9 @@ export type RegisterFormData = {
   email: string;
   password: string;
 };
+
+export type UpdateProfileFormData = {
+  name: string;
+  phone: string;
+  email: string;
+};
