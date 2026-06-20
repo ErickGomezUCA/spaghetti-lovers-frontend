@@ -7,9 +7,10 @@ import { Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
 import { AuthPageShell } from "@/components/auth/auth-page-shell";
 import { authService } from "@/lib/services/auth.service";
 import { ApiError } from "@/lib/exceptions/api-exceptions";
-import { apiClient } from "@/lib/api-client";
+import { apiClient } from "@/lib/clients/api-client";
 import { AppUser } from "@/types/api-responses";
 import { getRoleHref } from "@/utils/roles";
+import { authClient } from "@/lib/clients/auth-client";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -23,7 +24,7 @@ export default function LoginPage() {
 
     try {
       const res = await authService.login(email, password);
-      apiClient.saveAuth(res.data); // Save token + user
+      authClient.saveAuth(res.data); // Save token + user
       const { user } = res.data;
 
       setError("");

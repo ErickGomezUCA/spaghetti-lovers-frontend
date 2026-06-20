@@ -9,7 +9,13 @@ const get = (key: string): unknown => {
   return item ? JSON.parse(item) : null;
 };
 
-export const localStorageService = {
+const remove = (key: string) => {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(key);
+};
+
+export const localStorageClient = {
   save,
   get,
+  remove,
 };

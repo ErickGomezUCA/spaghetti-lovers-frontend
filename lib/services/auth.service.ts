@@ -1,4 +1,4 @@
-import { apiClient } from "@/lib/api-client";
+import { apiClient } from "@/lib/clients/api-client";
 import { ApiResponse, Auth } from "@/types/api-responses";
 
 export const authService = {

@@ -1,27 +1,12 @@
-import { AppUser, Auth } from "@/types/api-responses";
-import { ApiError } from "./exceptions/api-exceptions";
-import { localStorageService } from "./services/local-storage.service";
+import { Auth } from "@/types/api-responses";
+import { ApiError } from "../exceptions/api-exceptions";
+import { localStorageClient } from "./local-storage-client";
+import { authClient } from "./auth-client";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
-function getToken(): string | null {
-  if (typeof window === "undefined") return null;
-  const savedAuth = localStorageService.get("auth") as Auth | null;
-  if (!savedAuth) return null;
-  try {
-    return savedAuth.token ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function saveAuth(auth: Auth): void {
-  if (typeof window === "undefined") return;
-  localStorageService.save("auth", auth);
-}
-
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const token = getToken();
+  const token = authClient.getAuth()?.token;
 
   const res = await fetch(`${BASE_URL}${path}`, {
     ...options,
@@ -44,7 +29,6 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 export const apiClient = {
-  saveAuth: (auth: Auth) => saveAuth(auth),
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body: unknown) =>
     request<T>(path, { method: "POST", body: JSON.stringify(body) }),

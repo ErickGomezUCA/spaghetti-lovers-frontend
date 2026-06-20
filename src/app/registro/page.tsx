@@ -6,7 +6,7 @@ import { User, Building2, CheckCircle, ShieldAlert } from "lucide-react";
 import { AuthPageShell } from "@/components/auth/auth-page-shell";
 import { authService } from "@/lib/services/auth.service";
 import { ApiError } from "@/lib/exceptions/api-exceptions";
-import { apiClient } from "@/lib/api-client";
+import { apiClient } from "@/lib/clients/api-client";
 import {
   validateRegistration,
   formatPhone,
@@ -15,6 +15,7 @@ import {
 import { RegisterFormData } from "@/types/forms";
 import { getRoleHref } from "@/utils/roles";
 import { cn } from "@/utils/cn";
+import { authClient } from "@/lib/clients/auth-client";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -73,7 +74,7 @@ export default function RegisterPage() {
         phone: formData.phone,
         role,
       });
-      apiClient.saveAuth(res.data);
+      authClient.saveAuth(res.data);
 
       const { user } = res.data;
 
