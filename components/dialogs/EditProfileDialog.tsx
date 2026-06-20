@@ -34,7 +34,6 @@ const EditProfileDialog = ({ open, onOpenChange }: EditProfileDialogProps) => {
   });
   const [errors, setErrors] = useState<ValidationError[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [submitError, setSubmitError] = useState("");
 
   useEffect(() => {
     if (user) {
@@ -70,7 +69,6 @@ const EditProfileDialog = ({ open, onOpenChange }: EditProfileDialogProps) => {
 
   const submitEditForm = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setSubmitError("");
 
     const validation = validateProfileUpdate(editFormData);
     if (!validation.isValid) {
@@ -172,10 +170,13 @@ const EditProfileDialog = ({ open, onOpenChange }: EditProfileDialogProps) => {
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
+              disabled={isLoading}
             >
               Cancelar
             </Button>
-            <Button type="submit">Guardar Cambios</Button>
+            <Button type="submit" disabled={isLoading}>
+              Guardar Cambios
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

@@ -1,3 +1,4 @@
+import { ChangePasswordFormData } from "@/types/forms";
 import { RegisterRequest, UpdateProfileRequest } from "../services/user.dto";
 
 export interface ValidationError {
@@ -123,6 +124,44 @@ export const validateProfileUpdate = (
     errors.push({
       field: "phone",
       message: "Formato: +503 1234-5678",
+    });
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+  };
+};
+
+export const validatePasswordChange = (
+  data: ChangePasswordFormData,
+): RegisterValidationResult => {
+  const errors: ValidationError[] = [];
+
+  if (!data.oldPassword) {
+    errors.push({
+      field: "oldPassword",
+      message: "La contraseña actual es requerida",
+    });
+  }
+
+  if (!data.newPassword) {
+    errors.push({
+      field: "newPassword",
+      message: "La nueva contraseña es requerida",
+    });
+  } else if (!validatePassword(data.newPassword)) {
+    errors.push({
+      field: "newPassword",
+      message:
+        "Mínimo 12 caracteres, una mayúscula, un número y un carácter especial",
+    });
+  }
+
+  if (data.newPassword !== data.confirmNewPassword) {
+    errors.push({
+      field: "confirmNewPassword",
+      message: "Las contraseñas no coinciden",
     });
   }
 

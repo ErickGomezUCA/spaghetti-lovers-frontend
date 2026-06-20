@@ -1,19 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from "@/components/ui/dialog";
 import {
   User,
   Mail,
@@ -29,11 +19,8 @@ import {
 } from "lucide-react";
 import { mockReservations, mockIdentityDocument } from "@/lib/mock-data";
 import { useAuth } from "@/lib/contexts/auth-context";
-import { ValidationError } from "next/dist/compiled/amphtml-validator";
-import { UpdateProfileFormData } from "@/types/forms";
-import { formatPhone, validateProfileUpdate } from "@/lib/validators/users";
-import { userService } from "@/lib/services/user.service";
 import EditProfileDialog from "@/components/dialogs/EditProfileDialog";
+import ChangePasswordDialog from "@/components/dialogs/ChangePasswordDialog";
 
 export default function ProfilePage() {
   const { user } = useAuth();
@@ -269,45 +256,10 @@ export default function ProfilePage() {
       />
 
       {/* Change Password Dialog */}
-      <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Cambiar Contraseña</DialogTitle>
-            <DialogDescription>
-              Ingresa tu contraseña actual y la nueva contraseña
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Contraseña Actual
-              </Label>
-              <Input className="mt-1" type="password" />
-            </div>
-            <div>
-              <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Nueva Contraseña
-              </Label>
-              <Input className="mt-1" type="password" />
-            </div>
-            <div>
-              <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Confirmar Nueva Contraseña
-              </Label>
-              <Input className="mt-1" type="password" />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowPasswordDialog(false)}
-            >
-              Cancelar
-            </Button>
-            <Button>Cambiar Contraseña</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ChangePasswordDialog
+        open={showPasswordDialog}
+        onOpenChange={setShowPasswordDialog}
+      />
     </div>
   );
 }

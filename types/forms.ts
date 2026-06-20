@@ -10,3 +10,9 @@ export type UpdateProfileFormData = {
   phone: string;
   email: string;
 };
+
+export type ChangePasswordFormData = {
+  oldPassword: string;
+  newPassword: string;
+  confirmNewPassword: string;
+};

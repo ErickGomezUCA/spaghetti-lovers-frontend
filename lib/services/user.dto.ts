@@ -11,3 +11,8 @@ export type UpdateProfileRequest = {
   email: string;
   phone?: string;
 };
+
+export type ChangePasswordRequest = {
+  oldPassword: string;
+  newPassword: string;
+};
