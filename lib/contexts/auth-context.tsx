@@ -8,7 +8,6 @@ import {
   ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
-import { apiClient } from "@/lib/clients/api-client";
 import { authService } from "@/lib/services/auth.service";
 import { AppUser, Auth, UserRole } from "@/types/api-responses";
 import { authClient } from "../clients/auth-client";

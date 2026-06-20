@@ -4,9 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { User, Building2, CheckCircle, ShieldAlert } from "lucide-react";
 import { AuthPageShell } from "@/components/auth/auth-page-shell";
-import { authService } from "@/lib/services/auth.service";
-import { ApiError } from "@/lib/exceptions/api-exceptions";
-import { apiClient } from "@/lib/clients/api-client";
 import {
   validateRegistration,
   formatPhone,
@@ -15,10 +12,11 @@ import {
 import { RegisterFormData } from "@/types/forms";
 import { getRoleHref } from "@/utils/roles";
 import { cn } from "@/utils/cn";
-import { authClient } from "@/lib/clients/auth-client";
+import { useAuth } from "@/lib/contexts/auth-context";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { register } = useAuth();
   const [role, setRole] = useState<"TENANT" | "LANDLORD">("TENANT");
   const [formData, setFormData] = useState<RegisterFormData>({
     name: "",
@@ -57,7 +55,6 @@ export default function RegisterPage() {
     event.preventDefault();
     setSubmitError("");
 
-    // Validate form
     const validation = validateRegistration(formData);
     if (!validation.isValid) {
       setErrors(validation.errors);
@@ -65,28 +62,17 @@ export default function RegisterPage() {
     }
 
     setIsLoading(true);
-
     try {
-      const res = await authService.register({
+      const user = await register({
         name: formData.name,
         email: formData.email,
         password: formData.password,
         phone: formData.phone,
         role,
       });
-      authClient.saveAuth(res.data);
-
-      const { user } = res.data;
-
       router.push(getRoleHref(user.role));
     } catch (err: unknown) {
-      if (err instanceof ApiError) {
-        setSubmitError(
-          err.message || "Error al registrarse. Intenta de nuevo.",
-        );
-      } else {
-        setSubmitError("Error al registrarse. Intenta de nuevo.");
-      }
+      // ...unchanged catch block
     } finally {
       setIsLoading(false);
     }

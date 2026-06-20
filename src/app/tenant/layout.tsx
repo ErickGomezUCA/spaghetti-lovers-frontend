@@ -1,9 +1,9 @@
-import { TenantLayout } from '@/components/tenant/tenant-layout'
+import { TenantLayout } from "@/components/layout/tenant/tenant-layout";
 
 export default function TenantRootLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
-  return <TenantLayout>{children}</TenantLayout>
+  return <TenantLayout>{children}</TenantLayout>;
 }

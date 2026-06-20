@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Header } from "./header";
-import { Sidebar } from "./sidebar";
+import { TenantHeader } from "./tenant-header";
+import { TenantSidebar } from "./tenant-sidebar";
 import { cn } from "@/utils/cn";
 
 interface TenantLayoutProps {
@@ -14,14 +14,14 @@ export function TenantLayout({ children }: TenantLayoutProps) {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header
+      <TenantHeader
         onMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         isMobileMenuOpen={isMobileMenuOpen}
       />
 
       <div className="flex">
         {/* Desktop Sidebar */}
-        <Sidebar className="hidden w-64 shrink-0 border-r border-border bg-card lg:flex" />
+        <TenantSidebar className="hidden w-64 shrink-0 border-r border-border bg-card lg:flex" />
 
         {/* Mobile Sidebar Overlay */}
         {isMobileMenuOpen && (
@@ -30,7 +30,7 @@ export function TenantLayout({ children }: TenantLayoutProps) {
               className="absolute inset-0 bg-foreground/20 backdrop-blur-sm"
               onClick={() => setIsMobileMenuOpen(false)}
             />
-            <Sidebar
+            <TenantSidebar
               className="absolute left-0 top-0 h-full w-64 bg-card shadow-xl"
               onLinkClick={() => setIsMobileMenuOpen(false)}
             />

@@ -5,15 +5,13 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
 import { AuthPageShell } from "@/components/auth/auth-page-shell";
-import { authService } from "@/lib/services/auth.service";
 import { ApiError } from "@/lib/exceptions/api-exceptions";
-import { apiClient } from "@/lib/clients/api-client";
-import { AppUser } from "@/types/api-responses";
 import { getRoleHref } from "@/utils/roles";
-import { authClient } from "@/lib/clients/auth-client";
+import { useAuth } from "@/lib/contexts/auth-context";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -21,12 +19,8 @@ export default function LoginPage() {
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-
     try {
-      const res = await authService.login(email, password);
-      authClient.saveAuth(res.data); // Save token + user
-      const { user } = res.data;
-
+      const user = await login(email, password);
       setError("");
       router.push(getRoleHref(user.role));
     } catch (err: unknown) {

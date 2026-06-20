@@ -13,12 +13,15 @@ import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { currentUser, mockNotifications } from "@/lib/mock-data";
 
-interface HeaderProps {
+interface TenantHeaderProps {
   onMenuToggle?: () => void;
   isMobileMenuOpen?: boolean;
 }
 
-export function Header({ onMenuToggle, isMobileMenuOpen }: HeaderProps) {
+export function TenantHeader({
+  onMenuToggle,
+  isMobileMenuOpen,
+}: TenantHeaderProps) {
   const unreadCount = mockNotifications.filter((n) => !n.read).length;
 
   return (
