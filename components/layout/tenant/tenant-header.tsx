@@ -11,7 +11,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
-import { currentUser, mockNotifications } from "@/lib/mock-data";
+import { mockNotifications } from "@/lib/mock-data";
+import { useAuth } from "@/lib/contexts/auth-context";
 
 interface TenantHeaderProps {
   onMenuToggle?: () => void;
@@ -22,7 +23,12 @@ export function TenantHeader({
   onMenuToggle,
   isMobileMenuOpen,
 }: TenantHeaderProps) {
+  const { logout, user } = useAuth();
   const unreadCount = mockNotifications.filter((n) => !n.read).length;
+
+  const handleLogout = () => {
+    logout();
+  };
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-card">
@@ -112,9 +118,9 @@ export function TenantHeader({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <div className="px-3 py-2">
-                <p className="font-semibold">{currentUser.name}</p>
+                <p className="font-semibold">{user?.name ?? "No User"}</p>
                 <p className="text-xs text-muted-foreground">
-                  {currentUser.email}
+                  {user?.email ?? "No Email"}
                 </p>
               </div>
               <DropdownMenuSeparator />
@@ -126,7 +132,7 @@ export function TenantHeader({
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-destructive">
-                Cerrar Sesión
+                <button onClick={handleLogout}>Cerrar Sesión</button>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
