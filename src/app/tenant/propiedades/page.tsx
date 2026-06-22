@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Card,
   CardContent,
@@ -24,7 +24,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
@@ -45,46 +44,82 @@ import {
   ChevronRight,
   Maximize2,
 } from "lucide-react";
-import { mockProperties, type Property } from "@/lib/mock-data";
 import { cn } from "@/utils/cn";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { propertyService } from "@/lib/services/property.service";
+import { Property, PropertyType } from "@/types/api-responses";
 
-const propertyTypes = [
+const propertyTypeOptions: { value: PropertyType | "all"; label: string }[] = [
   { value: "all", label: "Todos los tipos" },
-  { value: "casa", label: "Casa" },
-  { value: "apartamento", label: "Apartamento" },
-  { value: "habitacion", label: "Habitación" },
-  { value: "casa_playa", label: "Casa de Playa" },
-  { value: "cabaña", label: "Cabaña" },
-  { value: "villa", label: "Villa" },
+  { value: "HOUSE", label: "Casa" },
+  { value: "APARTMENT", label: "Apartamento" },
+  { value: "ROOM", label: "Habitación" },
+  { value: "BEACH_HOUSE", label: "Casa de Playa" },
+  { value: "CABIN", label: "Cabaña" },
+  { value: "VILLA", label: "Villa" },
 ];
 
 export default function PropertiesPage() {
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [propertyType, setPropertyType] = useState("all");
-  const [selectedProperty, setSelectedProperty] = useState<Property | null>(
-    null,
-  );
+  const [guestsCount, setGuestsCount] = useState("2");
+
+  // Detail dialog
+  const [showDetailDialog, setShowDetailDialog] = useState(false);
+  const [detailProperty, setDetailProperty] = useState<Property | null>(null);
+
+  // Booking dialog
+  const [showBookingDialog, setShowBookingDialog] = useState(false);
+  const [bookingProperty, setBookingProperty] = useState<Property | null>(null);
   const [dateRange, setDateRange] = useState<{
     from: Date | undefined;
     to: Date | undefined;
-  }>({
-    from: undefined,
-    to: undefined,
-  });
-  const [guestsCount, setGuestsCount] = useState("2");
-  const [showBookingDialog, setShowBookingDialog] = useState(false);
+  }>({ from: undefined, to: undefined });
 
-  const filteredProperties = mockProperties.filter((property) => {
-    const matchesSearch =
-      property.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      property.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      property.department.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType =
-      propertyType === "all" || property.propertyType === propertyType;
-    return matchesSearch && matchesType && property.propertyStatus === "active";
-  });
+  useEffect(() => {
+    const fetchProperties = async () => {
+      setIsLoading(true);
+      try {
+        const res = await propertyService.getAll(0, 100);
+        setProperties(res.data);
+      } catch (err) {
+        console.error("Error fetching properties:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchProperties();
+  }, []);
+
+  const filteredProperties = useMemo(
+    () =>
+      properties.filter((property) => {
+        const matchesSearch =
+          property.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          property.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          property.department.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesType =
+          propertyType === "all" || property.propertyType === propertyType;
+        return (
+          matchesSearch && matchesType && property.propertyStatus === "ACTIVE"
+        );
+      }),
+    [properties, searchTerm, propertyType],
+  );
+
+  const openDetail = (property: Property) => {
+    setDetailProperty(property);
+    setShowDetailDialog(true);
+  };
+
+  const openBooking = (property: Property) => {
+    setBookingProperty(property);
+    setDateRange({ from: undefined, to: undefined });
+    setShowBookingDialog(true);
+  };
 
   const calculateTotal = (property: Property) => {
     if (!dateRange.from || !dateRange.to) return null;
@@ -140,7 +175,7 @@ export default function PropertiesPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {propertyTypes.map((type) => (
+                  {propertyTypeOptions.map((type) => (
                     <SelectItem key={type.value} value={type.value}>
                       {type.label}
                     </SelectItem>
@@ -169,158 +204,81 @@ export default function PropertiesPage() {
         </CardContent>
       </Card>
 
-      {/* Results */}
-      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-        {filteredProperties.map((property) => (
-          <Card key={property.id} className="overflow-hidden">
-            <div className="relative aspect-[4/3] bg-muted">
-              <img
-                src={property.photos[0]}
-                alt={property.title}
-                className="h-full w-full object-cover"
-              />
-              <Badge className="absolute right-3 top-3 bg-card text-foreground">
-                ${property.basePricePerNight}/noche
-              </Badge>
-            </div>
-            <CardHeader className="pb-2">
-              <div className="flex items-start justify-between gap-2">
-                <CardTitle className="text-base">{property.title}</CardTitle>
-                <div className="flex items-center gap-1 text-sm">
-                  <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                  <span>{property.landlordRating}</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                <MapPin className="h-4 w-4" />
-                <span>
-                  {property.city}, {property.department}
-                </span>
-              </div>
-            </CardHeader>
-            <CardContent className="pb-2">
-              <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <Bed className="h-4 w-4" /> {property.bedrooms}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Bath className="h-4 w-4" /> {property.bathrooms}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Users className="h-4 w-4" /> {property.maxGuests}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Maximize2 className="h-4 w-4" /> {property.areaSqm}m²
-                </span>
-              </div>
-            </CardContent>
-            <CardFooter className="gap-2 pt-2">
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => setSelectedProperty(property)}
-                  >
-                    Ver Detalles
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-2xl">
-                  <DialogHeader>
-                    <DialogTitle>{property.title}</DialogTitle>
-                    <DialogDescription>
-                      {property.city}, {property.department}
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="grid gap-4">
-                    <div className="aspect-video overflow-hidden rounded-lg bg-muted">
-                      <img
-                        src={property.photos[0]}
-                        alt={property.title}
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-                    <div className="grid gap-2 text-sm">
-                      <p>{property.description}</p>
-                      <div className="mt-2 flex flex-wrap gap-4 text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Bed className="h-4 w-4" /> {property.bedrooms}{" "}
-                          habitaciones
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Bath className="h-4 w-4" /> {property.bathrooms}{" "}
-                          baños
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Users className="h-4 w-4" /> Máx.{" "}
-                          {property.maxGuests} huéspedes
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Maximize2 className="h-4 w-4" /> {property.areaSqm}m²
-                        </span>
-                      </div>
-                      <div className="mt-4 rounded-lg bg-secondary p-4">
-                        <h4 className="font-semibold">
-                          Reglas de la propiedad
-                        </h4>
-                        <p className="mt-1 text-muted-foreground">
-                          {property.rules}
-                        </p>
-                      </div>
-                      <div className="mt-2 flex items-center justify-between">
-                        <div>
-                          <p className="text-xs text-muted-foreground">
-                            Propietario
-                          </p>
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">
-                              {property.landlordName}
-                            </span>
-                            <span className="flex items-center gap-1 text-sm">
-                              <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                              {property.landlordRating}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-2xl font-bold text-primary">
-                            ${property.basePricePerNight}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            por noche
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button
-                      className="w-full"
-                      onClick={() => {
-                        setSelectedProperty(property);
-                        setShowBookingDialog(true);
-                      }}
-                    >
-                      Reservar Ahora <ChevronRight className="ml-1 h-4 w-4" />
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-              <Button
-                className="flex-1"
-                onClick={() => {
-                  setSelectedProperty(property);
-                  setShowBookingDialog(true);
-                }}
-              >
-                Reservar
-              </Button>
-            </CardFooter>
-          </Card>
-        ))}
-      </div>
+      {/* Loading */}
+      {isLoading && (
+        <div className="text-center py-12 text-muted-foreground">
+          Cargando propiedades...
+        </div>
+      )}
 
-      {filteredProperties.length === 0 && (
+      {/* Results */}
+      {!isLoading && (
+        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+          {filteredProperties.map((property) => (
+            <Card key={property.id} className="overflow-hidden">
+              <div className="relative aspect-[4/3] bg-muted">
+                <img
+                  src={
+                    property.photoUrls[0] ??
+                    "/placeholder.svg?height=400&width=600"
+                  }
+                  alt={property.title}
+                  className="h-full w-full object-cover"
+                />
+                <Badge className="absolute right-3 top-3 bg-card text-foreground">
+                  ${property.basePricePerNight}/noche
+                </Badge>
+              </div>
+              <CardHeader className="pb-2">
+                <div className="flex items-start justify-between gap-2">
+                  <CardTitle className="text-base">{property.title}</CardTitle>
+                  <div className="flex items-center gap-1 text-sm">
+                    {/* TODO: Implement landlord rating from ratings endpoint */}
+                    <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                    <span>TODO</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                  <MapPin className="h-4 w-4" />
+                  <span>
+                    {property.city}, {property.department}
+                  </span>
+                </div>
+              </CardHeader>
+              <CardContent className="pb-2">
+                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <Bed className="h-4 w-4" /> {property.bedrooms}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Bath className="h-4 w-4" /> {property.bathrooms}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Users className="h-4 w-4" /> {property.maxGuests}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Maximize2 className="h-4 w-4" /> {property.areaSqm}m²
+                  </span>
+                </div>
+              </CardContent>
+              <CardFooter className="gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => openDetail(property)}
+                >
+                  Ver Detalles
+                </Button>
+                <Button className="flex-1" onClick={() => openBooking(property)}>
+                  Reservar
+                </Button>
+              </CardFooter>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {!isLoading && filteredProperties.length === 0 && (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Search className="mb-4 h-12 w-12 text-muted-foreground/50" />
@@ -334,14 +292,100 @@ export default function PropertiesPage() {
         </Card>
       )}
 
-      {/* Booking Dialog */}
+      {/* Detail Dialog — single instance outside the map */}
+      <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{detailProperty?.title}</DialogTitle>
+            <DialogDescription>
+              {detailProperty?.city}, {detailProperty?.department}
+            </DialogDescription>
+          </DialogHeader>
+          {detailProperty && (
+            <div className="grid gap-4">
+              <div className="aspect-video overflow-hidden rounded-lg bg-muted">
+                <img
+                  src={
+                    detailProperty.photoUrls[0] ??
+                    "/placeholder.svg?height=400&width=600"
+                  }
+                  alt={detailProperty.title}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+              <div className="grid gap-2 text-sm">
+                <p>{detailProperty.description}</p>
+                <div className="mt-2 flex flex-wrap gap-4 text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <Bed className="h-4 w-4" /> {detailProperty.bedrooms}{" "}
+                    habitaciones
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Bath className="h-4 w-4" /> {detailProperty.bathrooms}{" "}
+                    baños
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Users className="h-4 w-4" /> Máx.{" "}
+                    {detailProperty.maxGuests} huéspedes
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Maximize2 className="h-4 w-4" /> {detailProperty.areaSqm}
+                    m²
+                  </span>
+                </div>
+                <div className="mt-4 rounded-lg bg-secondary p-4">
+                  <h4 className="font-semibold">Reglas de la propiedad</h4>
+                  <p className="mt-1 text-muted-foreground">
+                    {detailProperty.rules}
+                  </p>
+                </div>
+                <div className="mt-2 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Propietario</p>
+                    <div className="flex items-center gap-2">
+                      {/* TODO: Fetch landlord name from GET /users/{landlordId} */}
+                      <span className="font-medium">TODO</span>
+                      <span className="flex items-center gap-1 text-sm">
+                        {/* TODO: Fetch landlord rating from ratings endpoint */}
+                        <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                        TODO
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-2xl font-bold text-primary">
+                      ${detailProperty.basePricePerNight}
+                    </p>
+                    <p className="text-xs text-muted-foreground">por noche</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              className="w-full"
+              onClick={() => {
+                if (detailProperty) {
+                  setShowDetailDialog(false);
+                  openBooking(detailProperty);
+                }
+              }}
+            >
+              Reservar Ahora <ChevronRight className="ml-1 h-4 w-4" />
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Booking Dialog — single instance outside the map */}
       <Dialog open={showBookingDialog} onOpenChange={setShowBookingDialog}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Crear Reserva</DialogTitle>
-            <DialogDescription>{selectedProperty?.title}</DialogDescription>
+            <DialogDescription>{bookingProperty?.title}</DialogDescription>
           </DialogHeader>
-          {selectedProperty && (
+          {bookingProperty && (
             <div className="grid gap-4">
               <div>
                 <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -360,7 +404,8 @@ export default function PropertiesPage() {
                       {dateRange.from ? (
                         dateRange.to ? (
                           <>
-                            {format(dateRange.from, "dd MMM", { locale: es })} -{" "}
+                            {format(dateRange.from, "dd MMM", { locale: es })}{" "}
+                            -{" "}
                             {format(dateRange.to, "dd MMM yyyy", {
                               locale: es,
                             })}
@@ -380,7 +425,10 @@ export default function PropertiesPage() {
                       defaultMonth={dateRange.from}
                       selected={dateRange}
                       onSelect={(range) =>
-                        setDateRange({ from: range?.from, to: range?.to })
+                        setDateRange({
+                          from: range?.from,
+                          to: range?.to,
+                        })
                       }
                       numberOfMonths={2}
                       disabled={(date) => date < new Date()}
@@ -399,7 +447,7 @@ export default function PropertiesPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {Array.from(
-                      { length: selectedProperty.maxGuests },
+                      { length: bookingProperty.maxGuests },
                       (_, i) => i + 1,
                     ).map((num) => (
                       <SelectItem key={num} value={num.toString()}>
@@ -437,21 +485,21 @@ export default function PropertiesPage() {
                 <div className="rounded-lg bg-secondary p-4">
                   <h4 className="font-semibold">Resumen de Precio</h4>
                   {(() => {
-                    const calc = calculateTotal(selectedProperty);
+                    const calc = calculateTotal(bookingProperty);
                     if (!calc) return null;
                     return (
                       <div className="mt-2 space-y-1 text-sm">
                         <div className="flex justify-between">
                           <span>
-                            ${selectedProperty.basePricePerNight} x{" "}
-                            {calc.nights} noches
+                            ${bookingProperty.basePricePerNight} x {calc.nights}{" "}
+                            noches
                           </span>
                           <span>${calc.baseTotal.toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between">
                           <span>Tarifa de limpieza</span>
                           <span>
-                            ${selectedProperty.cleaningFee.toFixed(2)}
+                            ${bookingProperty.cleaningFee.toFixed(2)}
                           </span>
                         </div>
                         {calc.discount > 0 && (
@@ -463,7 +511,7 @@ export default function PropertiesPage() {
                         <div className="flex justify-between">
                           <span>Depósito de garantía (reembolsable)</span>
                           <span>
-                            ${selectedProperty.securityDepositAmount.toFixed(2)}
+                            ${bookingProperty.securityDepositAmount.toFixed(2)}
                           </span>
                         </div>
                         <div className="mt-2 flex justify-between border-t border-border pt-2 font-bold">
@@ -494,6 +542,7 @@ export default function PropertiesPage() {
             >
               Cancelar
             </Button>
+            {/* TODO: Wire to POST /reservations endpoint */}
             <Button disabled={!dateRange.from || !dateRange.to}>
               Confirmar Reserva
             </Button>

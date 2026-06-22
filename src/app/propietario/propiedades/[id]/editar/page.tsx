@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,9 +15,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import Link from "next/link";
-import { ArrowLeft, Upload, X, MapPin, DollarSign, Home, Image } from "lucide-react";
+import { ArrowLeft, MapPin, DollarSign, Home, Settings } from "lucide-react";
 import { propertyService } from "@/lib/services/property.service";
-import { PropertyType } from "@/types/api-responses";
+import { PropertyStatus, PropertyType } from "@/types/api-responses";
 
 const propertyTypes: { value: PropertyType; label: string }[] = [
   { value: "HOUSE", label: "Casa" },
@@ -36,18 +36,25 @@ const propertyTypes: { value: PropertyType; label: string }[] = [
   { value: "PENTHOUSE", label: "Penthouse" },
 ];
 
-export default function NewPropertyPage() {
+const propertyStatuses: { value: PropertyStatus; label: string }[] = [
+  { value: "ACTIVE", label: "Activa" },
+  { value: "UNAVAILABLE", label: "No disponible" },
+];
+
+export default function EditPropertyPage() {
+  const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [photos, setPhotos] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
     propertyType: "" as PropertyType | "",
+    propertyStatus: "" as PropertyStatus | "",
     address: "",
     city: "",
     department: "",
-    country: "El Salvador",
+    country: "",
     basePricePerNight: "",
     cleaningFee: "",
     securityDepositAmount: "",
@@ -58,69 +65,106 @@ export default function NewPropertyPage() {
     rules: "",
   });
 
-  const handlePhotoUpload = () => {
-    // TODO: Implement real photo upload — currently adds placeholder URLs.
-    // Use propertyService.attachPhotos(id, { photoUrls }) after property is created.
-    const newPhoto = `/placeholder.svg?height=200&width=300&text=Foto${photos.length + 1}`;
-    setPhotos([...photos, newPhoto]);
-  };
-
-  const removePhoto = (index: number) => {
-    setPhotos(photos.filter((_, i) => i !== index));
-  };
+  useEffect(() => {
+    const fetchProperty = async () => {
+      setIsLoading(true);
+      try {
+        const res = await propertyService.getById(id);
+        const p = res.data;
+        setFormData({
+          title: p.title,
+          description: p.description ?? "",
+          propertyType: p.propertyType,
+          propertyStatus: p.propertyStatus,
+          address: p.address,
+          city: p.city,
+          department: p.department,
+          country: p.country,
+          basePricePerNight: String(p.basePricePerNight),
+          cleaningFee: String(p.cleaningFee),
+          securityDepositAmount: String(p.securityDepositAmount),
+          maxGuests: String(p.maxGuests),
+          bedrooms: String(p.bedrooms),
+          bathrooms: String(p.bathrooms),
+          areaSqm: String(p.areaSqm),
+          rules: p.rules ?? "",
+        });
+      } catch (err) {
+        console.error("Error fetching property:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchProperty();
+  }, [id]);
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData({ ...formData, [field]: value });
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-
-    if (!formData.propertyType) return;
-
-    setIsLoading(true);
+    setIsSaving(true);
     try {
-      await propertyService.create({
-        title: formData.title,
+      await propertyService.update(id, {
+        title: formData.title || undefined,
         description: formData.description || undefined,
-        address: formData.address,
-        city: formData.city,
-        department: formData.department,
-        country: formData.country,
-        basePricePerNight: parseFloat(formData.basePricePerNight),
-        cleaningFee: parseFloat(formData.cleaningFee),
-        securityDepositAmount: parseFloat(formData.securityDepositAmount),
-        maxGuests: parseInt(formData.maxGuests),
-        bedrooms: parseInt(formData.bedrooms),
-        bathrooms: parseInt(formData.bathrooms),
-        areaSqm: parseFloat(formData.areaSqm),
-        propertyType: formData.propertyType,
+        address: formData.address || undefined,
+        city: formData.city || undefined,
+        department: formData.department || undefined,
+        country: formData.country || undefined,
+        basePricePerNight: formData.basePricePerNight
+          ? parseFloat(formData.basePricePerNight)
+          : undefined,
+        cleaningFee: formData.cleaningFee
+          ? parseFloat(formData.cleaningFee)
+          : undefined,
+        securityDepositAmount: formData.securityDepositAmount
+          ? parseFloat(formData.securityDepositAmount)
+          : undefined,
+        maxGuests: formData.maxGuests
+          ? parseInt(formData.maxGuests)
+          : undefined,
+        bedrooms: formData.bedrooms ? parseInt(formData.bedrooms) : undefined,
+        bathrooms: formData.bathrooms
+          ? parseInt(formData.bathrooms)
+          : undefined,
+        areaSqm: formData.areaSqm ? parseFloat(formData.areaSqm) : undefined,
+        propertyType: (formData.propertyType as PropertyType) || undefined,
+        propertyStatus: (formData.propertyStatus as PropertyStatus) || undefined,
         rules: formData.rules || undefined,
-        photoUrls: photos.length > 0 ? photos : undefined,
       });
-      router.push("/propietario/propiedades");
+      router.push(`/propietario/propiedades/${id}`);
     } catch (err) {
-      console.error("Error creating property:", err);
+      console.error("Error updating property:", err);
     } finally {
-      setIsLoading(false);
+      setIsSaving(false);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="p-6 text-center text-muted-foreground">
+        Cargando propiedad...
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link href="/propietario/propiedades">
+        <Link href={`/propietario/propiedades/${id}`}>
           <Button variant="ghost" size="icon">
             <ArrowLeft className="w-5 h-5" />
           </Button>
         </Link>
         <div>
           <h1 className="text-2xl font-semibold text-foreground">
-            Nueva Propiedad
+            Editar Propiedad
           </h1>
           <p className="text-muted-foreground">
-            Registra una nueva propiedad para alquilar
+            Actualiza la información de tu propiedad
           </p>
         </div>
       </div>
@@ -137,26 +181,18 @@ export default function NewPropertyPage() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label
-                  htmlFor="title"
-                  className="text-xs uppercase text-muted-foreground font-medium"
-                >
+                <Label className="text-xs uppercase text-muted-foreground font-medium">
                   Título de la Propiedad
                 </Label>
                 <Input
-                  id="title"
                   placeholder="Ej. Apartamento con vista al mar"
                   value={formData.title}
                   onChange={(e) => handleInputChange("title", e.target.value)}
                   className="bg-input"
-                  required
                 />
               </div>
               <div className="space-y-2">
-                <Label
-                  htmlFor="propertyType"
-                  className="text-xs uppercase text-muted-foreground font-medium"
-                >
+                <Label className="text-xs uppercase text-muted-foreground font-medium">
                   Tipo de Propiedad
                 </Label>
                 <Select
@@ -179,15 +215,11 @@ export default function NewPropertyPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label
-                htmlFor="description"
-                className="text-xs uppercase text-muted-foreground font-medium"
-              >
+              <Label className="text-xs uppercase text-muted-foreground font-medium">
                 Descripción
               </Label>
               <Textarea
-                id="description"
-                placeholder="Describe tu propiedad, sus características y lo que la hace especial..."
+                placeholder="Describe tu propiedad..."
                 rows={4}
                 value={formData.description}
                 onChange={(e) =>
@@ -198,85 +230,98 @@ export default function NewPropertyPage() {
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="space-y-2">
-                <Label
-                  htmlFor="bedrooms"
-                  className="text-xs uppercase text-muted-foreground font-medium"
-                >
+                <Label className="text-xs uppercase text-muted-foreground font-medium">
                   Habitaciones
                 </Label>
                 <Input
-                  id="bedrooms"
                   type="number"
                   min="0"
-                  placeholder="0"
                   value={formData.bedrooms}
                   onChange={(e) =>
                     handleInputChange("bedrooms", e.target.value)
                   }
                   className="bg-input"
-                  required
                 />
               </div>
               <div className="space-y-2">
-                <Label
-                  htmlFor="bathrooms"
-                  className="text-xs uppercase text-muted-foreground font-medium"
-                >
+                <Label className="text-xs uppercase text-muted-foreground font-medium">
                   Baños
                 </Label>
                 <Input
-                  id="bathrooms"
                   type="number"
                   min="0"
-                  placeholder="0"
                   value={formData.bathrooms}
                   onChange={(e) =>
                     handleInputChange("bathrooms", e.target.value)
                   }
                   className="bg-input"
-                  required
                 />
               </div>
               <div className="space-y-2">
-                <Label
-                  htmlFor="maxGuests"
-                  className="text-xs uppercase text-muted-foreground font-medium"
-                >
+                <Label className="text-xs uppercase text-muted-foreground font-medium">
                   Huéspedes Máx.
                 </Label>
                 <Input
-                  id="maxGuests"
                   type="number"
                   min="1"
-                  placeholder="0"
                   value={formData.maxGuests}
                   onChange={(e) =>
                     handleInputChange("maxGuests", e.target.value)
                   }
                   className="bg-input"
-                  required
                 />
               </div>
               <div className="space-y-2">
-                <Label
-                  htmlFor="areaSqm"
-                  className="text-xs uppercase text-muted-foreground font-medium"
-                >
+                <Label className="text-xs uppercase text-muted-foreground font-medium">
                   Área (m²)
                 </Label>
                 <Input
-                  id="areaSqm"
                   type="number"
                   min="0"
-                  placeholder="0"
                   value={formData.areaSqm}
                   onChange={(e) =>
                     handleInputChange("areaSqm", e.target.value)
                   }
                   className="bg-input"
-                  required
                 />
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Status */}
+        <Card className="border-t-4 border-t-primary">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Settings className="w-5 h-5 text-primary" />
+              Estado
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="max-w-xs space-y-2">
+              <Label className="text-xs uppercase text-muted-foreground font-medium">
+                Estado de la Propiedad
+              </Label>
+              <Select
+                value={formData.propertyStatus}
+                onValueChange={(value) =>
+                  handleInputChange("propertyStatus", value)
+                }
+              >
+                <SelectTrigger className="bg-input">
+                  <SelectValue placeholder="Selecciona el estado" />
+                </SelectTrigger>
+                <SelectContent>
+                  {propertyStatuses.map((s) => (
+                    <SelectItem key={s.value} value={s.value}>
+                      {s.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                El estado RESERVADA es asignado automáticamente por el sistema.
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -291,69 +336,47 @@ export default function NewPropertyPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label
-                htmlFor="address"
-                className="text-xs uppercase text-muted-foreground font-medium"
-              >
+              <Label className="text-xs uppercase text-muted-foreground font-medium">
                 Dirección
               </Label>
               <Input
-                id="address"
                 placeholder="Calle, número, colonia"
                 value={formData.address}
                 onChange={(e) => handleInputChange("address", e.target.value)}
                 className="bg-input"
-                required
               />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label
-                  htmlFor="city"
-                  className="text-xs uppercase text-muted-foreground font-medium"
-                >
+                <Label className="text-xs uppercase text-muted-foreground font-medium">
                   Ciudad
                 </Label>
                 <Input
-                  id="city"
-                  placeholder="San Salvador"
                   value={formData.city}
                   onChange={(e) => handleInputChange("city", e.target.value)}
                   className="bg-input"
-                  required
                 />
               </div>
               <div className="space-y-2">
-                <Label
-                  htmlFor="department"
-                  className="text-xs uppercase text-muted-foreground font-medium"
-                >
+                <Label className="text-xs uppercase text-muted-foreground font-medium">
                   Departamento
                 </Label>
                 <Input
-                  id="department"
-                  placeholder="San Salvador"
                   value={formData.department}
                   onChange={(e) =>
                     handleInputChange("department", e.target.value)
                   }
                   className="bg-input"
-                  required
                 />
               </div>
               <div className="space-y-2">
-                <Label
-                  htmlFor="country"
-                  className="text-xs uppercase text-muted-foreground font-medium"
-                >
+                <Label className="text-xs uppercase text-muted-foreground font-medium">
                   País
                 </Label>
                 <Input
-                  id="country"
                   value={formData.country}
                   onChange={(e) => handleInputChange("country", e.target.value)}
                   className="bg-input"
-                  required
                 />
               </div>
             </div>
@@ -371,116 +394,51 @@ export default function NewPropertyPage() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label
-                  htmlFor="basePricePerNight"
-                  className="text-xs uppercase text-muted-foreground font-medium"
-                >
+                <Label className="text-xs uppercase text-muted-foreground font-medium">
                   Precio por Noche (USD)
                 </Label>
                 <Input
-                  id="basePricePerNight"
                   type="number"
                   min="0"
                   step="0.01"
-                  placeholder="0.00"
                   value={formData.basePricePerNight}
                   onChange={(e) =>
                     handleInputChange("basePricePerNight", e.target.value)
                   }
                   className="bg-input"
-                  required
                 />
               </div>
               <div className="space-y-2">
-                <Label
-                  htmlFor="cleaningFee"
-                  className="text-xs uppercase text-muted-foreground font-medium"
-                >
+                <Label className="text-xs uppercase text-muted-foreground font-medium">
                   Tarifa de Limpieza (USD)
                 </Label>
                 <Input
-                  id="cleaningFee"
                   type="number"
                   min="0"
                   step="0.01"
-                  placeholder="0.00"
                   value={formData.cleaningFee}
                   onChange={(e) =>
                     handleInputChange("cleaningFee", e.target.value)
                   }
                   className="bg-input"
-                  required
                 />
               </div>
               <div className="space-y-2">
-                <Label
-                  htmlFor="securityDepositAmount"
-                  className="text-xs uppercase text-muted-foreground font-medium"
-                >
+                <Label className="text-xs uppercase text-muted-foreground font-medium">
                   Depósito de Garantía (USD)
                 </Label>
                 <Input
-                  id="securityDepositAmount"
                   type="number"
                   min="0"
                   step="0.01"
-                  placeholder="0.00"
                   value={formData.securityDepositAmount}
                   onChange={(e) =>
                     handleInputChange("securityDepositAmount", e.target.value)
                   }
                   className="bg-input"
-                  required
                 />
               </div>
             </div>
-            <p className="text-sm text-muted-foreground">
-              * Se aplica un descuento del 10% automático para estadías de 28
-              noches o más.
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Photos */}
-        <Card className="border-t-4 border-t-primary">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Image className="w-5 h-5 text-primary" />
-              Fotos
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {photos.map((photo, index) => (
-                <div key={index} className="relative group">
-                  <img
-                    src={photo}
-                    alt={`Foto ${index + 1}`}
-                    className="w-full h-32 object-cover rounded-lg"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removePhoto(index)}
-                    className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
-              {/* TODO: Replace with real file upload — use POST /properties/attach-photos/{id} */}
-              <button
-                type="button"
-                onClick={handlePhotoUpload}
-                className="h-32 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-primary hover:text-primary transition-colors"
-              >
-                <Upload className="w-6 h-6" />
-                <span className="text-sm">Subir foto</span>
-              </button>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Sube al menos 3 fotos de tu propiedad. La primera foto será la
-              imagen principal.
-            </p>
           </CardContent>
         </Card>
 
@@ -491,15 +449,11 @@ export default function NewPropertyPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              <Label
-                htmlFor="rules"
-                className="text-xs uppercase text-muted-foreground font-medium"
-              >
+              <Label className="text-xs uppercase text-muted-foreground font-medium">
                 Reglas y Políticas
               </Label>
               <Textarea
-                id="rules"
-                placeholder="Describe las reglas de tu propiedad, horarios de check-in/check-out, políticas sobre mascotas, fiestas, ruido, etc."
+                placeholder="Describe las reglas de tu propiedad..."
                 rows={6}
                 value={formData.rules}
                 onChange={(e) => handleInputChange("rules", e.target.value)}
@@ -511,7 +465,7 @@ export default function NewPropertyPage() {
 
         {/* Actions */}
         <div className="flex justify-end gap-4">
-          <Link href="/propietario/propiedades">
+          <Link href={`/propietario/propiedades/${id}`}>
             <Button variant="outline" type="button">
               Cancelar
             </Button>
@@ -519,9 +473,9 @@ export default function NewPropertyPage() {
           <Button
             type="submit"
             className="bg-primary hover:bg-primary/90"
-            disabled={isLoading}
+            disabled={isSaving}
           >
-            {isLoading ? "Publicando..." : "Publicar Propiedad"}
+            {isSaving ? "Guardando..." : "Guardar Cambios"}
           </Button>
         </div>
       </form>
