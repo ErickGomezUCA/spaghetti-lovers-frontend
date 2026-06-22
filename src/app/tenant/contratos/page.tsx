@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useToast } from '@/hooks/use-toast'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -41,6 +42,7 @@ function formatDate(dateStr: string, options?: Intl.DateTimeFormatOptions) {
 
 export default function ContractsPage() {
   const { user } = useAuth()
+  const { toast } = useToast()
   const [contracts, setContracts] = useState<ContractDetailResponse[]>([])
   const [showSignDialog, setShowSignDialog] = useState(false)
   const [selectedContract, setSelectedContract] = useState<ContractDetailResponse | null>(null)
@@ -71,8 +73,12 @@ export default function ContractsPage() {
         prev.map((c) => (c.id === selectedContract.id ? res.data : c))
       )
       setShowSignDialog(false)
-    } catch {
-      // TODO: show error toast
+    } catch (err: unknown) {
+      toast({
+        title: "Error al firmar",
+        description: err instanceof Error ? err.message : "No se pudo firmar el contrato.",
+        variant: "destructive",
+      })
     } finally {
       setIsSigning(false)
     }
