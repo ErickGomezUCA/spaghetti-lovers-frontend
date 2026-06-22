@@ -69,6 +69,26 @@ export type UserProfileResponse = {
   ratings: RatingResponse[];
 };
 
+export type ContractStatus = "SIGNED" | "PENDING_SIGNATURES";
+
+export type ContractDetailResponse = {
+  id: string;
+  reservationId: string;
+  contentUrl: string | null;
+  contractStatus: ContractStatus;
+  tenantSignatureId: string | null;
+  landlordSignatureId: string | null;
+  createdAtTimestamp: string | null;
+  expiresAtTimestamp: string | null;
+  propertyTitle: string;
+  propertyCity: string;
+  checkInDate: string;
+  checkOutDate: string;
+  totalPrice: number;
+  tenantName: string;
+  landlordName: string;
+};
+
 export type Property = {
   id: string;
   landlordId: string;
