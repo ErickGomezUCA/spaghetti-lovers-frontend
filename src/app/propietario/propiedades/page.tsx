@@ -33,6 +33,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useAuth } from "@/lib/contexts/auth-context";
 import { propertyService } from "@/lib/services/property.service";
 import { Property, PropertyStatus, PropertyType } from "@/types/api-responses";
@@ -74,6 +84,7 @@ export default function PropertiesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [propertyToDelete, setPropertyToDelete] = useState<Property | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -91,13 +102,15 @@ export default function PropertiesPage() {
     fetchProperties();
   }, [user]);
 
-  const handleDelete = async (id: string) => {
-    // TODO: add confirmation dialog before deleting
+  const confirmDelete = async () => {
+    if (!propertyToDelete) return;
     try {
-      await propertyService.delete(id);
-      setProperties((prev) => prev.filter((p) => p.id !== id));
+      await propertyService.delete(propertyToDelete.id);
+      setProperties((prev) => prev.filter((p) => p.id !== propertyToDelete.id));
     } catch (err) {
       console.error("Error deleting property:", err);
+    } finally {
+      setPropertyToDelete(null);
     }
   };
 
@@ -243,7 +256,7 @@ export default function PropertiesPage() {
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       className="text-destructive"
-                      onClick={() => handleDelete(property.id)}
+                      onClick={() => setPropertyToDelete(property)}
                     >
                       <Trash2 className="w-4 h-4 mr-2" /> Eliminar
                     </DropdownMenuItem>
@@ -289,10 +302,6 @@ export default function PropertiesPage() {
                         /noche
                       </span>
                     </div>
-                    {/* TODO: Fetch reservation count from reservations endpoint */}
-                    <span className="text-xs text-muted-foreground">
-                      TODO reservas
-                    </span>
                   </div>
                 </div>
               </CardContent>
@@ -300,6 +309,32 @@ export default function PropertiesPage() {
           ))}
         </div>
       )}
+
+      {/* Delete confirmation */}
+      <AlertDialog
+        open={!!propertyToDelete}
+        onOpenChange={(open) => !open && setPropertyToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar propiedad?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará permanentemente{" "}
+              <span className="font-semibold">{propertyToDelete?.title}</span> y
+              todas sus fotos asociadas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={confirmDelete}
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Empty State */}
       {!isLoading && filteredProperties.length === 0 && (

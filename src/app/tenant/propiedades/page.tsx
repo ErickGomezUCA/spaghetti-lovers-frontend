@@ -47,6 +47,7 @@ import { cn } from "@/utils/cn";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { propertyService } from "@/lib/services/property.service";
+import { userService } from "@/lib/services/user.service";
 import { Property, PropertyType } from "@/types/api-responses";
 
 const propertyTypeOptions: { value: PropertyType | "all"; label: string }[] = [
@@ -69,6 +70,7 @@ export default function PropertiesPage() {
   // Detail dialog
   const [showDetailDialog, setShowDetailDialog] = useState(false);
   const [detailProperty, setDetailProperty] = useState<Property | null>(null);
+  const [detailLandlordName, setDetailLandlordName] = useState<string | null>(null);
 
   // Booking dialog
   const [showBookingDialog, setShowBookingDialog] = useState(false);
@@ -149,7 +151,11 @@ export default function PropertiesPage() {
 
   const openDetail = (property: Property) => {
     setDetailProperty(property);
+    setDetailLandlordName(null);
     setShowDetailDialog(true);
+    userService.getUserById(property.landlordId)
+      .then((res) => setDetailLandlordName(res.data.name))
+      .catch(() => {});
   };
 
   const openBooking = (property: Property) => {
@@ -253,7 +259,7 @@ export default function PropertiesPage() {
         <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
           {filteredProperties.map((property) => (
             <Card key={property.id} className="overflow-hidden">
-              <div className="relative aspect-[4/3] bg-muted">
+              <div className="relative aspect-[4/3] min-h-48 bg-muted">
                 <img
                   src={
                     property.photoUrls[0] ??
@@ -378,8 +384,9 @@ export default function PropertiesPage() {
                   <div>
                     <p className="text-xs text-muted-foreground">Propietario</p>
                     <div className="flex items-center gap-2">
-                      {/* TODO: Fetch landlord name from GET /users/{landlordId} */}
-                      <span className="font-medium">TODO</span>
+                      <span className="font-medium">
+                        {detailLandlordName ?? "Cargando..."}
+                      </span>
                     </div>
                   </div>
                   <div className="text-right">

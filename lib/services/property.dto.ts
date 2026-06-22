@@ -1,5 +1,10 @@
 import { PropertyStatus, PropertyType } from "@/types/api-responses";
 
+export type PhotoEntry = {
+  url: string;
+  publicId: string;
+};
+
 export type CreatePropertyRequest = {
   title: string;
   description?: string;
@@ -16,7 +21,6 @@ export type CreatePropertyRequest = {
   areaSqm: number;
   propertyType: PropertyType;
   rules?: string;
-  photoUrls?: string[];
 };
 
 export type UpdatePropertyRequest = {
@@ -39,5 +43,5 @@ export type UpdatePropertyRequest = {
 };
 
 export type AttachPhotoRequest = {
-  photoUrls: string[];
+  photoUrls: PhotoEntry[];
 };

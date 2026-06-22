@@ -16,12 +16,12 @@ import {
   DollarSign,
   Shield,
   Star,
-  Calendar,
   Home,
   User,
 } from "lucide-react";
 import Link from "next/link";
 import { propertyService } from "@/lib/services/property.service";
+import { userService } from "@/lib/services/user.service";
 import { Property, PropertyStatus, PropertyType } from "@/types/api-responses";
 
 const propertyTypeLabels: Record<PropertyType, string> = {
@@ -57,6 +57,8 @@ export default function AdminPropertyDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [property, setProperty] = useState<Property | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [landlordName, setLandlordName] = useState<string | null>(null);
+  const [averageScore, setAverageScore] = useState<string>("N/A");
 
   useEffect(() => {
     const fetchProperty = async () => {
@@ -64,6 +66,18 @@ export default function AdminPropertyDetailPage() {
       try {
         const res = await propertyService.getById(id);
         setProperty(res.data);
+        const landlordId = res.data.landlordId;
+        Promise.allSettled([
+          userService.getUserById(landlordId),
+          userService.getRating(landlordId),
+        ]).then(([userResult, ratingResult]) => {
+          if (userResult.status === "fulfilled")
+            setLandlordName(userResult.value.data.name);
+          if (ratingResult.status === "fulfilled") {
+            const score = ratingResult.value.data.averageScore;
+            setAverageScore(score != null ? score.toFixed(1) : "N/A");
+          }
+        });
       } catch (err) {
         console.error("Error fetching property:", err);
       } finally {
@@ -215,8 +229,9 @@ export default function AdminPropertyDetailPage() {
               <Separator />
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Nombre</span>
-                {/* TODO: Fetch landlord name from GET /users/{landlordId} */}
-                <span className="font-medium">TODO</span>
+                <span className="font-medium">
+                  {landlordName ?? "Cargando..."}
+                </span>
               </div>
             </CardContent>
           </Card>
@@ -231,16 +246,7 @@ export default function AdminPropertyDetailPage() {
                 <span className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Star className="w-4 h-4 text-amber-500" /> Calificación
                 </span>
-                {/* TODO: Fetch average rating from ratings endpoint */}
-                <span className="font-medium">TODO</span>
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Calendar className="w-4 h-4" /> Reservas totales
-                </span>
-                {/* TODO: Fetch reservation count from reservations endpoint */}
-                <span className="font-medium">TODO</span>
+                <span className="font-medium">{averageScore}</span>
               </div>
             </CardContent>
           </Card>

@@ -26,6 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { propertyService } from "@/lib/services/property.service";
+import { userService } from "@/lib/services/user.service";
 import { Property, PropertyStatus, PropertyType } from "@/types/api-responses";
 
 const statusConfig: Record<
@@ -60,6 +61,7 @@ export default function AdminPropertiesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<PropertyStatus | "all">("all");
+  const [landlordNames, setLandlordNames] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const fetchProperties = async () => {
@@ -67,6 +69,18 @@ export default function AdminPropertiesPage() {
       try {
         const res = await propertyService.getAll(0, 100);
         setProperties(res.data);
+
+        const uniqueIds = [...new Set(res.data.map((p) => p.landlordId))];
+        const results = await Promise.allSettled(
+          uniqueIds.map((id) => userService.getUserById(id))
+        );
+        const names: Record<string, string> = {};
+        results.forEach((result, i) => {
+          if (result.status === "fulfilled") {
+            names[uniqueIds[i]] = result.value.data.name;
+          }
+        });
+        setLandlordNames(names);
       } catch (err) {
         console.error("Error fetching properties:", err);
       } finally {
@@ -252,18 +266,12 @@ export default function AdminPropertiesPage() {
                           {property.address}, {property.city}
                         </span>
                         <span className="flex items-center gap-1">
-                          {/* TODO: Fetch landlord name from GET /users/{landlordId} — only landlordId is returned */}
                           <User className="w-4 h-4" />
-                          ID: {property.landlordId}
+                          {landlordNames[property.landlordId] ?? "Cargando..."}
                         </span>
                         <span className="flex items-center gap-1">
                           <DollarSign className="w-4 h-4" />
                           ${property.basePricePerNight}/noche
-                        </span>
-                        <span className="flex items-center gap-1">
-                          {/* TODO: Fetch reservation count from reservations endpoint */}
-                          <Calendar className="w-4 h-4" />
-                          TODO reservas
                         </span>
                       </div>
                     </div>

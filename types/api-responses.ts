@@ -12,6 +12,12 @@ export type ApiResponse<T> = {
   pagination?: PaginationMeta;
 };
 
+export type FileUploadResponse = {
+  url: string;
+  publicId: string;
+  resourceType: string;
+};
+
 export type UserRole = "ADMIN" | "LANDLORD" | "TENANT";
 
 export type AppUser = {
@@ -54,6 +60,12 @@ export type RatingResponse = {
   score: number;
   comment: string;
   createdAt: string;
+};
+
+export type UserRatingsResponse = {
+  totalRatings: number;
+  averageScore: number | null;
+  ratings: RatingResponse[];
 };
 
 export type UserProfileResponse = {

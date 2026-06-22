@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,8 +15,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import Link from "next/link";
-import { ArrowLeft, Upload, X, MapPin, DollarSign, Home, Image } from "lucide-react";
+import {
+  ArrowLeft,
+  Upload,
+  X,
+  MapPin,
+  DollarSign,
+  Home,
+  Image,
+  Loader2,
+} from "lucide-react";
 import { propertyService } from "@/lib/services/property.service";
+import { uploadService } from "@/lib/services/upload.service";
+import { PhotoEntry } from "@/lib/services/property.dto";
 import { PropertyType } from "@/types/api-responses";
 
 const propertyTypes: { value: PropertyType; label: string }[] = [
@@ -36,10 +47,15 @@ const propertyTypes: { value: PropertyType; label: string }[] = [
   { value: "PENTHOUSE", label: "Penthouse" },
 ];
 
+type UploadedPhoto = PhotoEntry & { previewUrl: string };
+
 export default function NewPropertyPage() {
   const router = useRouter();
-  const [photos, setPhotos] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [photos, setPhotos] = useState<UploadedPhoto[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -58,29 +74,53 @@ export default function NewPropertyPage() {
     rules: "",
   });
 
-  const handlePhotoUpload = () => {
-    // TODO: Implement real photo upload — currently adds placeholder URLs.
-    // Use propertyService.attachPhotos(id, { photoUrls }) after property is created.
-    const newPhoto = `/placeholder.svg?height=200&width=300&text=Foto${photos.length + 1}`;
-    setPhotos([...photos, newPhoto]);
-  };
-
-  const removePhoto = (index: number) => {
-    setPhotos(photos.filter((_, i) => i !== index));
-  };
-
   const handleInputChange = (field: string, value: string) => {
     setFormData({ ...formData, [field]: value });
   };
 
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
+
+    setUploadError(null);
+    setIsUploading(true);
+
+    const results = await Promise.allSettled(
+      files.map((file) => uploadService.uploadImage(file)),
+    );
+
+    const uploaded: UploadedPhoto[] = [];
+    const errors: string[] = [];
+
+    results.forEach((result, i) => {
+      if (result.status === "fulfilled") {
+        uploaded.push({
+          url: result.value.data.url,
+          publicId: result.value.data.publicId,
+          previewUrl: result.value.data.url,
+        });
+      } else {
+        errors.push(`${files[i].name}: ${(result.reason as Error)?.message ?? "Error al subir"}`);
+      }
+    });
+
+    setPhotos((prev) => [...prev, ...uploaded]);
+    if (errors.length > 0) setUploadError(errors.join(", "));
+    setIsUploading(false);
+    e.target.value = "";
+  };
+
+  const removePhoto = (index: number) => {
+    setPhotos((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-
     if (!formData.propertyType) return;
 
     setIsLoading(true);
     try {
-      await propertyService.create({
+      const created = await propertyService.create({
         title: formData.title,
         description: formData.description || undefined,
         address: formData.address,
@@ -96,8 +136,14 @@ export default function NewPropertyPage() {
         areaSqm: parseFloat(formData.areaSqm),
         propertyType: formData.propertyType,
         rules: formData.rules || undefined,
-        photoUrls: photos.length > 0 ? photos : undefined,
       });
+
+      if (photos.length > 0) {
+        await propertyService.attachPhotos(created.data.id, {
+          photoUrls: photos.map(({ url, publicId }) => ({ url, publicId })),
+        });
+      }
+
       router.push("/propietario/propiedades");
     } catch (err) {
       console.error("Error creating property:", err);
@@ -450,11 +496,19 @@ export default function NewPropertyPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              className="hidden"
+              onChange={handleFileChange}
+            />
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {photos.map((photo, index) => (
                 <div key={index} className="relative group">
                   <img
-                    src={photo}
+                    src={photo.previewUrl}
                     alt={`Foto ${index + 1}`}
                     className="w-full h-32 object-cover rounded-lg"
                   />
@@ -467,19 +521,31 @@ export default function NewPropertyPage() {
                   </button>
                 </div>
               ))}
-              {/* TODO: Replace with real file upload — use POST /properties/attach-photos/{id} */}
               <button
                 type="button"
-                onClick={handlePhotoUpload}
-                className="h-32 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+                disabled={isUploading}
+                onClick={() => fileInputRef.current?.click()}
+                className="h-32 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-primary hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Upload className="w-6 h-6" />
-                <span className="text-sm">Subir foto</span>
+                {isUploading ? (
+                  <>
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                    <span className="text-sm">Subiendo...</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-6 h-6" />
+                    <span className="text-sm">Subir fotos</span>
+                  </>
+                )}
               </button>
             </div>
+            {uploadError && (
+              <p className="text-sm text-destructive">{uploadError}</p>
+            )}
             <p className="text-sm text-muted-foreground">
-              Sube al menos 3 fotos de tu propiedad. La primera foto será la
-              imagen principal.
+              Acepta JPG, PNG y WEBP — máx. 10 MB por imagen. La primera foto
+              será la imagen principal.
             </p>
           </CardContent>
         </Card>
@@ -519,7 +585,7 @@ export default function NewPropertyPage() {
           <Button
             type="submit"
             className="bg-primary hover:bg-primary/90"
-            disabled={isLoading}
+            disabled={isLoading || isUploading}
           >
             {isLoading ? "Publicando..." : "Publicar Propiedad"}
           </Button>

@@ -7,6 +7,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   ArrowLeft,
   Edit,
   Trash2,
@@ -23,6 +33,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { propertyService } from "@/lib/services/property.service";
+import { userService } from "@/lib/services/user.service";
 import { Property, PropertyStatus, PropertyType } from "@/types/api-responses";
 
 const propertyTypeLabels: Record<PropertyType, string> = {
@@ -59,6 +70,8 @@ export default function PropertyDetailPage() {
   const router = useRouter();
   const [property, setProperty] = useState<Property | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [averageScore, setAverageScore] = useState<string>("N/A");
 
   useEffect(() => {
     const fetchProperty = async () => {
@@ -66,6 +79,10 @@ export default function PropertyDetailPage() {
       try {
         const res = await propertyService.getById(id);
         setProperty(res.data);
+        userService.getRating(res.data.landlordId).then((r) => {
+          const score = r.data.averageScore;
+          setAverageScore(score != null ? score.toFixed(1) : "N/A");
+        }).catch(() => {});
       } catch (err) {
         console.error("Error fetching property:", err);
       } finally {
@@ -76,7 +93,6 @@ export default function PropertyDetailPage() {
   }, [id]);
 
   const handleDelete = async () => {
-    // TODO: replace with confirmation dialog
     if (!property) return;
     try {
       await propertyService.delete(property.id);
@@ -141,7 +157,7 @@ export default function PropertyDetailPage() {
               Editar
             </Button>
           </Link>
-          <Button variant="destructive" onClick={handleDelete}>
+          <Button variant="destructive" onClick={() => setConfirmDelete(true)}>
             <Trash2 className="w-4 h-4 mr-2" />
             Eliminar
           </Button>
@@ -232,16 +248,7 @@ export default function PropertyDetailPage() {
                 <span className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Star className="w-4 h-4 text-amber-500" /> Calificación
                 </span>
-                {/* TODO: Fetch average rating from ratings endpoint */}
-                <span className="font-medium">TODO</span>
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Calendar className="w-4 h-4" /> Reservas totales
-                </span>
-                {/* TODO: Fetch reservation count from reservations endpoint */}
-                <span className="font-medium">TODO</span>
+                <span className="font-medium">{averageScore}</span>
               </div>
             </CardContent>
           </Card>
@@ -385,6 +392,28 @@ export default function PropertyDetailPage() {
           </Card>
         </div>
       </div>
+
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar propiedad?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará permanentemente{" "}
+              <span className="font-semibold">{property?.title}</span> y todas
+              sus fotos asociadas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleDelete}
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
