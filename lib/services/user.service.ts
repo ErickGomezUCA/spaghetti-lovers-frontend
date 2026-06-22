@@ -25,5 +25,5 @@ export const userService = {
     apiClient.post("/users/change-password", data),
 
   getProfile: () =>
-    apiClient.get<ApiResponse<UserProfileResponse>>("/users/me/profile"),
+    apiClient.get<ApiResponse<UserProfileResponse>>("/users/profile"),
 };

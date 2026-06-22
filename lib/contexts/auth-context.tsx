@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { userService } from "@/lib/services/user.service";
 import { AppUser, Auth, UserRole } from "@/types/api-responses";
 import { authClient } from "../clients/auth-client";
+import { ApiError } from "../exceptions/api-exceptions";
 
 type RegisterPayload = {
   name: string;
@@ -39,37 +40,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // TODO: Fetch user from /me instead of saved auth
   useEffect(() => {
     const savedAuth = authClient.getAuth();
-    if (savedAuth) {
-      setUser(savedAuth.user);
-      setToken(savedAuth.token);
+    if (!savedAuth) {
+      setIsLoading(false);
+      return;
     }
-    setIsLoading(false);
+
+    userService
+      .me()
+      .then((res) => {
+        const freshUser = res.data;
+        authClient.saveAuth({ token: savedAuth.token, user: freshUser });
+        setUser(freshUser);
+        setToken(savedAuth.token);
+      })
+      .catch((err) => {
+        // TODO: Consider leaving 403 as an unhandled error (server-side permission issue)
+        //       instead of treating it the same as 401 (expired/invalid token).
+        if (err instanceof ApiError && (err.statusCode === 401 || err.statusCode === 403)) {
+          authClient.clearAuth();
+          router.push("/login");
+        }
+      })
+      .finally(() => setIsLoading(false));
   }, []);
-
-  // useEffect(() => {
-  //   const fetchUser = async () => {
-  //     try {
-  //       const res = await userService.me();
-  //       console.log(res);
-  //       const auth = res.data;
-  //       setUser(auth.user);
-  //       setToken(auth.token);
-  //       console.log("Fetched user info:", auth.user);
-  //     } catch (error) {
-  //       console.error("Failed to fetch user info:", error);
-  //       authClient.clearAuth();
-  //       setUser(null);
-  //       setToken(null);
-  //     } finally {
-  //       setIsLoading(false);
-  //     }
-  //   };
-
-  //   fetchUser();
-  // }, []);
 
   const applyAuth = (auth: Auth) => {
     authClient.saveAuth(auth);

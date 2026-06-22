@@ -57,6 +57,15 @@ export default function ProfilePage() {
                 </h2>
               </div>
               <p className="text-muted-foreground">Inquilino</p>
+              {profile?.createdAt && (
+                <p className="text-xs text-muted-foreground">
+                  Miembro desde{" "}
+                  {new Date(profile.createdAt).toLocaleDateString("es-ES", {
+                    month: "long",
+                    year: "numeric",
+                  })}
+                </p>
+              )}
               <div className="mt-2 flex items-center justify-center gap-4 md:justify-start">
                 <div className="flex items-center gap-1">
                   <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
