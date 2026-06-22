@@ -22,6 +22,7 @@ import { useAuth } from "@/lib/contexts/auth-context";
 import { userService } from "@/lib/services/user.service";
 import { authClient } from "@/lib/clients/auth-client";
 import { UserProfileResponse } from "@/types/api-responses";
+import { useToast } from "@/components/ui/use-toast";
 import {
   formatPhone,
   validateProfileUpdate,
@@ -32,6 +33,7 @@ import { UpdateProfileFormData, ChangePasswordFormData } from "@/types/forms";
 
 export default function ProfilePage() {
   const { user, logout } = useAuth();
+  const { toast } = useToast();
   const [profile, setProfile] = useState<UserProfileResponse | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<UpdateProfileFormData>({
@@ -102,8 +104,7 @@ export default function ProfilePage() {
         user: updatedUser.data,
       });
       setIsEditing(false);
-      // TODO: replace with toast notification once toast is set up
-      window.location.reload();
+      toast({ title: "Perfil actualizado", description: "Tus cambios fueron guardados correctamente." });
     } catch (err) {
       console.error("Profile update error:", err);
     } finally {
@@ -173,7 +174,15 @@ export default function ProfilePage() {
                   ({profile?.ratingsCount ?? 0} reseñas)
                 </span>
               </div>
-              {/* TODO: Show member since date when createdAt is returned by /me endpoint */}
+              {profile?.createdAt && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Miembro desde{" "}
+                  {new Date(profile.createdAt).toLocaleDateString("es-ES", {
+                    month: "long",
+                    year: "numeric",
+                  })}
+                </p>
+              )}
             </div>
 
             <Separator className="my-6" />

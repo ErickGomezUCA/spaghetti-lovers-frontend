@@ -20,6 +20,7 @@ export type AppUser = {
   email: string;
   role: UserRole;
   phone?: string;
+  createdAt?: string;
 };
 
 export type Auth = {
@@ -61,6 +62,7 @@ export type UserProfileResponse = {
   email: string;
   phone?: string;
   role: UserRole;
+  createdAt: string | null;
   propertiesCount: number;
   reservationsCount: number;
   completedReservationsCount: number;
