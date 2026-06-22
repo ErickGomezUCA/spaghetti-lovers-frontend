@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Card,
   CardContent,
@@ -42,6 +42,8 @@ import {
   CalendarIcon,
   ChevronRight,
   Maximize2,
+  Minus,
+  Plus,
 } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { format } from "date-fns";
@@ -55,9 +57,17 @@ const propertyTypeOptions: { value: PropertyType | "all"; label: string }[] = [
   { value: "HOUSE", label: "Casa" },
   { value: "APARTMENT", label: "Apartamento" },
   { value: "ROOM", label: "Habitación" },
-  { value: "BEACH_HOUSE", label: "Casa de Playa" },
-  { value: "CABIN", label: "Cabaña" },
+  { value: "STUDIO", label: "Estudio" },
   { value: "VILLA", label: "Villa" },
+  { value: "CABIN", label: "Cabaña" },
+  { value: "BEACH_HOUSE", label: "Casa de Playa" },
+  { value: "COUNTRY_HOUSE", label: "Casa de Campo" },
+  { value: "LOFT", label: "Loft" },
+  { value: "CONDOMINIUM", label: "Condominio" },
+  { value: "HOSTEL", label: "Hostal" },
+  { value: "HOTEL", label: "Hotel" },
+  { value: "DUPLEX", label: "Dúplex" },
+  { value: "PENTHOUSE", label: "Penthouse" },
 ];
 
 export default function PropertiesPage() {
@@ -65,7 +75,7 @@ export default function PropertiesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [propertyType, setPropertyType] = useState("all");
-  const [guestsCount, setGuestsCount] = useState("2");
+  const [guestsCount, setGuestsCount] = useState(1);
 
   // Detail dialog
   const [showDetailDialog, setShowDetailDialog] = useState(false);
@@ -75,79 +85,39 @@ export default function PropertiesPage() {
   // Booking dialog
   const [showBookingDialog, setShowBookingDialog] = useState(false);
   const [bookingProperty, setBookingProperty] = useState<Property | null>(null);
+  const [bookingGuests, setBookingGuests] = useState("1");
   const [dateRange, setDateRange] = useState<{
     from: Date | undefined;
     to: Date | undefined;
   }>({ from: undefined, to: undefined });
 
-  useEffect(() => {
-    console.log("[DEBUG] PropertiesPage mounted");
-
-    const origPush = history.pushState.bind(history);
-    const origReplace = history.replaceState.bind(history);
-
-    history.pushState = function (
-      ...args: Parameters<typeof history.pushState>
-    ) {
-      console.log(
-        "[DEBUG] history.pushState →",
-        args[2],
-        new Error("pushState stack").stack,
-      );
-      return origPush(...args);
-    };
-    history.replaceState = function (
-      ...args: Parameters<typeof history.replaceState>
-    ) {
-      console.log(
-        "[DEBUG] history.replaceState →",
-        args[2],
-        new Error("replaceState stack").stack,
-      );
-      return origReplace(...args);
-    };
-
-    return () => {
-      history.pushState = origPush;
-      history.replaceState = origReplace;
-      console.log("[DEBUG] PropertiesPage unmounted");
-    };
-  }, []);
+  const [debouncedTerm, setDebouncedTerm] = useState("");
 
   useEffect(() => {
-    const fetchProperties = async () => {
-      setIsLoading(true);
-      try {
-        const res = await propertyService.getAll(0, 100);
-        setProperties(res.data);
-      } catch (err) {
-        console.error("Error fetching properties:", err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    const t = setTimeout(() => setDebouncedTerm(searchTerm), 600);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
+
+  const fetchProperties = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const res = await propertyService.getAll(0, 100, {
+        term: debouncedTerm || undefined,
+        propertyType: propertyType !== "all" ? propertyType : undefined,
+        minGuests: guestsCount,
+        status: "ACTIVE",
+      });
+      setProperties(res.data);
+    } catch (err) {
+      console.error("Error fetching properties:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [debouncedTerm, propertyType, guestsCount]);
+
+  useEffect(() => {
     fetchProperties();
-  }, []);
-
-  const filteredProperties = useMemo(
-    () =>
-      properties.filter((property) => {
-        const title = property.title ?? "";
-        const city = property.city ?? "";
-        const department = property.department ?? "";
-        const search = searchTerm.toLowerCase();
-        const matchesSearch =
-          title.toLowerCase().includes(search) ||
-          city.toLowerCase().includes(search) ||
-          department.toLowerCase().includes(search);
-        const matchesType =
-          propertyType === "all" || property.propertyType === propertyType;
-        return (
-          matchesSearch && matchesType && property.propertyStatus === "ACTIVE"
-        );
-      }),
-    [properties, searchTerm, propertyType],
-  );
+  }, [fetchProperties]);
 
   const openDetail = (property: Property) => {
     setDetailProperty(property);
@@ -228,20 +198,31 @@ export default function PropertiesPage() {
             </div>
             <div>
               <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Huéspedes
+                Huéspedes mínimos
               </Label>
-              <Select value={guestsCount} onValueChange={setGuestsCount}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[1, 2, 3, 4, 5, 6, 7, 8].map((num) => (
-                    <SelectItem key={num} value={num.toString()}>
-                      {num} {num === 1 ? "huésped" : "huéspedes"}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="mt-1 flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9 shrink-0"
+                  onClick={() => setGuestsCount((g) => Math.max(1, g - 1))}
+                  disabled={guestsCount <= 1}
+                >
+                  <Minus className="h-4 w-4" />
+                </Button>
+                <span className="w-10 text-center text-sm font-medium">
+                  {guestsCount === 10 ? "10+" : guestsCount}
+                </span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9 shrink-0"
+                  onClick={() => setGuestsCount((g) => Math.min(10, g + 1))}
+                  disabled={guestsCount >= 10}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </div>
         </CardContent>
@@ -257,7 +238,7 @@ export default function PropertiesPage() {
       {/* Results */}
       {!isLoading && (
         <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {filteredProperties.map((property) => (
+          {properties.map((property) => (
             <Card key={property.id} className="overflow-hidden">
               <div className="relative aspect-[4/3] min-h-48 bg-muted">
                 <img
@@ -319,7 +300,7 @@ export default function PropertiesPage() {
         </div>
       )}
 
-      {!isLoading && filteredProperties.length === 0 && (
+      {!isLoading && properties.length === 0 && (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Search className="mb-4 h-12 w-12 text-muted-foreground/50" />
@@ -477,7 +458,7 @@ export default function PropertiesPage() {
                 <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                   Número de Huéspedes
                 </Label>
-                <Select value={guestsCount} onValueChange={setGuestsCount}>
+                <Select value={bookingGuests} onValueChange={setBookingGuests}>
                   <SelectTrigger className="mt-1">
                     <SelectValue />
                   </SelectTrigger>

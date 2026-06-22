@@ -6,11 +6,22 @@ import {
   UpdatePropertyRequest,
 } from "./property.dto";
 
+type SearchParams = {
+  term?: string;
+  propertyType?: string;
+  minGuests?: number;
+  status?: string;
+};
+
 export const propertyService = {
-  getAll: (page = 0, pageSize = 10) =>
-    apiClient.get<ApiResponse<Property[]>>(
-      `/properties?page=${page}&pageSize=${pageSize}`,
-    ),
+  getAll: (page = 0, pageSize = 10, search?: SearchParams) => {
+    const q = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+    if (search?.term) q.set("term", search.term);
+    if (search?.propertyType) q.set("propertyType", search.propertyType);
+    if (search?.minGuests) q.set("minGuests", String(search.minGuests));
+    if (search?.status) q.set("status", search.status);
+    return apiClient.get<ApiResponse<Property[]>>(`/properties?${q}`);
+  },
 
   getById: (id: string) =>
     apiClient.get<ApiResponse<Property>>(`/properties/${id}`),
