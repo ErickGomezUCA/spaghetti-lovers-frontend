@@ -21,6 +21,7 @@ import {
 import { useAuth } from "@/lib/contexts/auth-context";
 import { userService } from "@/lib/services/user.service";
 import { authClient } from "@/lib/clients/auth-client";
+import { UserProfileResponse } from "@/types/api-responses";
 import {
   formatPhone,
   validateProfileUpdate,
@@ -31,6 +32,7 @@ import { UpdateProfileFormData, ChangePasswordFormData } from "@/types/forms";
 
 export default function ProfilePage() {
   const { user, logout } = useAuth();
+  const [profile, setProfile] = useState<UserProfileResponse | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<UpdateProfileFormData>({
     name: "",
@@ -56,6 +58,12 @@ export default function ProfilePage() {
       });
     }
   }, [user]);
+
+  useEffect(() => {
+    userService.getProfile().then((res) => setProfile(res.data)).catch(() => {});
+  }, []);
+
+  const averageScore = profile?.averageScore?.toFixed(1) ?? "N/A";
 
   const getProfileError = (field: string) =>
     profileErrors.find((e) => e.field === field)?.message;
@@ -160,11 +168,9 @@ export default function ProfilePage() {
               </Badge>
               <div className="flex items-center gap-1 mt-3">
                 <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                {/* TODO: Implement average rating from ratings endpoint */}
-                <span className="font-semibold">TODO</span>
+                <span className="font-semibold">{averageScore}</span>
                 <span className="text-muted-foreground">
-                  {/* TODO: Implement total ratings count from ratings endpoint */}
-                  (TODO reseñas)
+                  ({profile?.ratingsCount ?? 0} reseñas)
                 </span>
               </div>
               {/* TODO: Show member since date when createdAt is returned by /me endpoint */}
@@ -208,35 +214,37 @@ export default function ProfilePage() {
         <div className="lg:col-span-2 space-y-6">
           {/* Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {/* TODO: Fetch totalProperties from GET /properties?landlordId={user.id} */}
             <Card className="border-t-4 border-t-blue-500">
               <CardContent className="p-4 text-center">
                 <Building2 className="w-6 h-6 text-blue-600 mx-auto mb-2" />
-                <p className="text-2xl font-semibold">TODO</p>
+                <p className="text-2xl font-semibold">
+                  {profile?.propertiesCount ?? 0}
+                </p>
                 <p className="text-xs text-muted-foreground">Propiedades</p>
               </CardContent>
             </Card>
-            {/* TODO: Fetch totalReservations from reservations endpoint */}
             <Card className="border-t-4 border-t-green-500">
               <CardContent className="p-4 text-center">
                 <Calendar className="w-6 h-6 text-green-600 mx-auto mb-2" />
-                <p className="text-2xl font-semibold">TODO</p>
+                <p className="text-2xl font-semibold">
+                  {profile?.reservationsCount ?? 0}
+                </p>
                 <p className="text-xs text-muted-foreground">Reservas</p>
               </CardContent>
             </Card>
-            {/* TODO: Fetch averageRating from ratings endpoint */}
             <Card className="border-t-4 border-t-yellow-500">
               <CardContent className="p-4 text-center">
                 <Star className="w-6 h-6 text-yellow-600 mx-auto mb-2" />
-                <p className="text-2xl font-semibold">TODO</p>
+                <p className="text-2xl font-semibold">{averageScore}</p>
                 <p className="text-xs text-muted-foreground">Calificación</p>
               </CardContent>
             </Card>
-            {/* TODO: Fetch totalRatings from ratings endpoint */}
             <Card className="border-t-4 border-t-purple-500">
               <CardContent className="p-4 text-center">
                 <User className="w-6 h-6 text-purple-600 mx-auto mb-2" />
-                <p className="text-2xl font-semibold">TODO</p>
+                <p className="text-2xl font-semibold">
+                  {profile?.ratingsCount ?? 0}
+                </p>
                 <p className="text-xs text-muted-foreground">Reseñas</p>
               </CardContent>
             </Card>

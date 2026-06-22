@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,13 +12,13 @@ import {
   Shield,
   Edit,
   Lock,
-  CheckCircle2,
   CalendarDays,
   Home,
   FileCheck,
 } from "lucide-react";
-import { mockReservations, mockIdentityDocument } from "@/lib/mock-data";
 import { useAuth } from "@/lib/contexts/auth-context";
+import { userService } from "@/lib/services/user.service";
+import { UserProfileResponse } from "@/types/api-responses";
 import EditProfileDialog from "@/components/dialogs/EditProfileDialog";
 import ChangePasswordDialog from "@/components/dialogs/ChangePasswordDialog";
 
@@ -26,11 +26,13 @@ export default function ProfilePage() {
   const { user } = useAuth();
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [profile, setProfile] = useState<UserProfileResponse | null>(null);
 
-  const totalReservations = mockReservations.length;
-  const completedReservations = mockReservations.filter(
-    (r) => r.reservationStatus === "completed",
-  ).length;
+  useEffect(() => {
+    userService.getProfile().then((res) => setProfile(res.data)).catch(() => {});
+  }, []);
+
+  const averageScore = profile?.averageScore?.toFixed(1) ?? "N/A";
 
   return (
     <div className="space-y-6">
@@ -53,23 +55,14 @@ export default function ProfilePage() {
                 <h2 className="text-2xl font-bold">
                   {user?.name ?? "Nombre no disponible"}
                 </h2>
-                {mockIdentityDocument?.documentStatus === "verified" && (
-                  <Badge className="bg-green-100 text-green-800">
-                    <CheckCircle2 className="mr-1 h-3 w-3" /> Verificado
-                  </Badge>
-                )}
               </div>
               <p className="text-muted-foreground">Inquilino</p>
               <div className="mt-2 flex items-center justify-center gap-4 md:justify-start">
                 <div className="flex items-center gap-1">
                   <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                  <span className="font-medium">
-                    {/* TODO: Implement average rating {user?.averageRating} */}
-                    TODO
-                  </span>
+                  <span className="font-medium">{averageScore}</span>
                   <span className="text-sm text-muted-foreground">
-                    {/* TODO: Implement total ratings ({user?.totalRatings} calificaciones) */}
-                    TODO
+                    ({profile?.ratingsCount ?? 0} calificaciones)
                   </span>
                 </div>
               </div>
@@ -124,7 +117,9 @@ export default function ProfilePage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="rounded-lg bg-secondary p-4 text-center">
                 <Home className="mx-auto h-6 w-6 text-primary" />
-                <p className="mt-2 text-2xl font-bold">{totalReservations}</p>
+                <p className="mt-2 text-2xl font-bold">
+                  {profile?.reservationsCount ?? 0}
+                </p>
                 <p className="text-xs text-muted-foreground">
                   Reservas Totales
                 </p>
@@ -132,26 +127,21 @@ export default function ProfilePage() {
               <div className="rounded-lg bg-secondary p-4 text-center">
                 <CalendarDays className="mx-auto h-6 w-6 text-primary" />
                 <p className="mt-2 text-2xl font-bold">
-                  {completedReservations}
+                  {profile?.completedReservationsCount ?? 0}
                 </p>
                 <p className="text-xs text-muted-foreground">Completadas</p>
               </div>
               <div className="rounded-lg bg-secondary p-4 text-center">
                 <Star className="mx-auto h-6 w-6 text-amber-500" />
-                <p className="mt-2 text-2xl font-bold">
-                  {/* TODO: Implement average rating {user?.averageRating} */}
-                  TODO
-                </p>
+                <p className="mt-2 text-2xl font-bold">{averageScore}</p>
                 <p className="text-xs text-muted-foreground">Calificación</p>
               </div>
               <div className="rounded-lg bg-secondary p-4 text-center">
                 <FileCheck className="mx-auto h-6 w-6 text-green-600" />
                 <p className="mt-2 text-2xl font-bold">
-                  {mockIdentityDocument?.documentStatus === "verified"
-                    ? "Sí"
-                    : "No"}
+                  {profile?.ratingsCount ?? 0}
                 </p>
-                <p className="text-xs text-muted-foreground">Verificado</p>
+                <p className="text-xs text-muted-foreground">Reseñas</p>
               </div>
             </div>
           </CardContent>
@@ -189,24 +179,13 @@ export default function ProfilePage() {
                 </div>
                 <div>
                   <p className="font-medium">Verificación de Identidad</p>
+                  {/* TODO: Fetch verification status from identity document endpoint */}
                   <p className="text-sm text-muted-foreground">
-                    {mockIdentityDocument?.documentStatus === "verified"
-                      ? "Documento verificado"
-                      : "Pendiente de verificación"}
+                    Pendiente de verificación
                   </p>
                 </div>
               </div>
-              <Badge
-                className={
-                  mockIdentityDocument?.documentStatus === "verified"
-                    ? "bg-green-100 text-green-800"
-                    : "bg-amber-100 text-amber-800"
-                }
-              >
-                {mockIdentityDocument?.documentStatus === "verified"
-                  ? "Verificado"
-                  : "Pendiente"}
-              </Badge>
+              <Badge className="bg-amber-100 text-amber-800">Pendiente</Badge>
             </div>
           </CardContent>
         </Card>

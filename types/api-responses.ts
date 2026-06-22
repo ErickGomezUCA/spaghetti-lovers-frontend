@@ -45,6 +45,30 @@ export type PropertyType =
 
 export type PropertyStatus = "ACTIVE" | "RESERVED" | "UNAVAILABLE";
 
+export type RatingResponse = {
+  id: string;
+  reservationId: string;
+  reviewerId: string;
+  reviewedId: string;
+  score: number;
+  comment: string;
+  createdAt: string;
+};
+
+export type UserProfileResponse = {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  role: UserRole;
+  propertiesCount: number;
+  reservationsCount: number;
+  completedReservationsCount: number;
+  ratingsCount: number;
+  averageScore: number | null;
+  ratings: RatingResponse[];
+};
+
 export type Property = {
   id: string;
   landlordId: string;

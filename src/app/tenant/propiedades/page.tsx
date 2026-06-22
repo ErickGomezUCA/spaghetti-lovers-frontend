@@ -38,7 +38,6 @@ import {
   Bath,
   Users,
   MapPin,
-  Star,
   Search,
   CalendarIcon,
   ChevronRight,
@@ -80,6 +79,40 @@ export default function PropertiesPage() {
   }>({ from: undefined, to: undefined });
 
   useEffect(() => {
+    console.log("[DEBUG] PropertiesPage mounted");
+
+    const origPush = history.pushState.bind(history);
+    const origReplace = history.replaceState.bind(history);
+
+    history.pushState = function (
+      ...args: Parameters<typeof history.pushState>
+    ) {
+      console.log(
+        "[DEBUG] history.pushState →",
+        args[2],
+        new Error("pushState stack").stack,
+      );
+      return origPush(...args);
+    };
+    history.replaceState = function (
+      ...args: Parameters<typeof history.replaceState>
+    ) {
+      console.log(
+        "[DEBUG] history.replaceState →",
+        args[2],
+        new Error("replaceState stack").stack,
+      );
+      return origReplace(...args);
+    };
+
+    return () => {
+      history.pushState = origPush;
+      history.replaceState = origReplace;
+      console.log("[DEBUG] PropertiesPage unmounted");
+    };
+  }, []);
+
+  useEffect(() => {
     const fetchProperties = async () => {
       setIsLoading(true);
       try {
@@ -97,10 +130,14 @@ export default function PropertiesPage() {
   const filteredProperties = useMemo(
     () =>
       properties.filter((property) => {
+        const title = property.title ?? "";
+        const city = property.city ?? "";
+        const department = property.department ?? "";
+        const search = searchTerm.toLowerCase();
         const matchesSearch =
-          property.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          property.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          property.department.toLowerCase().includes(searchTerm.toLowerCase());
+          title.toLowerCase().includes(search) ||
+          city.toLowerCase().includes(search) ||
+          department.toLowerCase().includes(search);
         const matchesType =
           propertyType === "all" || property.propertyType === propertyType;
         return (
@@ -232,11 +269,6 @@ export default function PropertiesPage() {
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between gap-2">
                   <CardTitle className="text-base">{property.title}</CardTitle>
-                  <div className="flex items-center gap-1 text-sm">
-                    {/* TODO: Implement landlord rating from ratings endpoint */}
-                    <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                    <span>TODO</span>
-                  </div>
                 </div>
                 <div className="flex items-center gap-1 text-sm text-muted-foreground">
                   <MapPin className="h-4 w-4" />
@@ -269,7 +301,10 @@ export default function PropertiesPage() {
                 >
                   Ver Detalles
                 </Button>
-                <Button className="flex-1" onClick={() => openBooking(property)}>
+                <Button
+                  className="flex-1"
+                  onClick={() => openBooking(property)}
+                >
                   Reservar
                 </Button>
               </CardFooter>
@@ -345,11 +380,6 @@ export default function PropertiesPage() {
                     <div className="flex items-center gap-2">
                       {/* TODO: Fetch landlord name from GET /users/{landlordId} */}
                       <span className="font-medium">TODO</span>
-                      <span className="flex items-center gap-1 text-sm">
-                        {/* TODO: Fetch landlord rating from ratings endpoint */}
-                        <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                        TODO
-                      </span>
                     </div>
                   </div>
                   <div className="text-right">
@@ -404,8 +434,7 @@ export default function PropertiesPage() {
                       {dateRange.from ? (
                         dateRange.to ? (
                           <>
-                            {format(dateRange.from, "dd MMM", { locale: es })}{" "}
-                            -{" "}
+                            {format(dateRange.from, "dd MMM", { locale: es })} -{" "}
                             {format(dateRange.to, "dd MMM yyyy", {
                               locale: es,
                             })}
@@ -498,9 +527,7 @@ export default function PropertiesPage() {
                         </div>
                         <div className="flex justify-between">
                           <span>Tarifa de limpieza</span>
-                          <span>
-                            ${bookingProperty.cleaningFee.toFixed(2)}
-                          </span>
+                          <span>${bookingProperty.cleaningFee.toFixed(2)}</span>
                         </div>
                         {calc.discount > 0 && (
                           <div className="flex justify-between text-green-600">

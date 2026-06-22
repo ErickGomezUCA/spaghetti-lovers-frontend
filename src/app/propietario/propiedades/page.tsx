@@ -258,11 +258,6 @@ export default function PropertiesPage() {
                       <Badge variant="outline" className="text-xs">
                         {propertyTypeLabels[property.propertyType]}
                       </Badge>
-                      <div className="flex items-center gap-1 text-sm">
-                        {/* TODO: Implement property rating from ratings endpoint */}
-                        <span className="text-yellow-500">★</span>
-                        <span className="font-medium">TODO</span>
-                      </div>
                     </div>
                     <h3 className="font-semibold text-lg mt-2">
                       {property.title}

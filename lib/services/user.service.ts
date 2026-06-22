@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/clients/api-client";
-import { ApiResponse, AppUser, Auth } from "@/types/api-responses";
+import { ApiResponse, AppUser, Auth, UserProfileResponse } from "@/types/api-responses";
 import {
   ChangePasswordRequest,
   RegisterRequest,
@@ -23,4 +23,7 @@ export const userService = {
 
   changePassword: (data: ChangePasswordRequest) =>
     apiClient.post("/users/change-password", data),
+
+  getProfile: () =>
+    apiClient.get<ApiResponse<UserProfileResponse>>("/users/me/profile"),
 };
