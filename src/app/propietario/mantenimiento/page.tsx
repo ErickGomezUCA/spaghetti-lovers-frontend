@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,7 +19,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import {
   Table,
@@ -31,121 +30,217 @@ import {
 } from "@/components/ui/table"
 import {
   Search,
-  Plus,
   Wrench,
   Eye,
   Play,
   CheckCircle,
   Clock,
   AlertTriangle,
-  Image,
   Calendar,
+  RefreshCw,
+  Plus,
 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
-
-// Mock data
-const maintenanceRequests = [
-  {
-    id: "MNT-001",
-    property: "Apartamento Centro Histórico",
-    reservationId: "RES-001",
-    title: "Aire acondicionado no funciona",
-    description: "El AC de la habitación principal no enciende",
-    urgency: "high",
-    status: "scheduled",
-    reportedBy: "María García",
-    reportedByRole: "tenant",
-    requestPhotos: ["/placeholder.svg?text=AC1", "/placeholder.svg?text=AC2"],
-    responsePhotos: [],
-    createdAt: "2024-06-16",
-    scheduledStart: null,
-    scheduledEnd: null,
-    resolutionNotes: null,
-  },
-  {
-    id: "MNT-002",
-    property: "Casa de Playa Costa del Sol",
-    reservationId: null,
-    title: "Reparación de cerca perimetral",
-    description: "Una sección de la cerca fue dañada por el viento",
-    urgency: "medium",
-    status: "resolving",
-    reportedBy: "Juan Propietario",
-    reportedByRole: "landlord",
-    requestPhotos: ["/placeholder.svg?text=Fence1"],
-    responsePhotos: [],
-    createdAt: "2024-06-14",
-    scheduledStart: "2024-06-17",
-    scheduledEnd: "2024-06-18",
-    resolutionNotes: null,
-  },
-  {
-    id: "MNT-003",
-    property: "Loft Moderno Zona Rosa",
-    reservationId: "RES-003",
-    title: "Fuga en el baño",
-    description: "Hay una pequeña fuga debajo del lavamanos",
-    urgency: "critical",
-    status: "resolved",
-    reportedBy: "Ana Martínez",
-    reportedByRole: "tenant",
-    requestPhotos: ["/placeholder.svg?text=Leak1", "/placeholder.svg?text=Leak2"],
-    responsePhotos: ["/placeholder.svg?text=Fixed1"],
-    createdAt: "2024-05-15",
-    scheduledStart: "2024-05-15",
-    scheduledEnd: "2024-05-15",
-    resolutionNotes: "Fuga reparada. Se reemplazó el sifón del lavamanos.",
-  },
-]
+import { maintenanceService } from "@/lib/services/maintenance.service"
+import { propertyService } from "@/lib/services/property.service"
+import {
+  MaintenanceResponse,
+  MaintenanceScheduleResponse,
+  Property,
+  MaintenanceScheduleFrequency,
+} from "@/types/api-responses"
+import { useAuth } from "@/lib/contexts/auth-context"
 
 const urgencyColors: Record<string, string> = {
-  low: "bg-blue-100 text-blue-700 border-blue-200",
-  medium: "bg-yellow-100 text-yellow-700 border-yellow-200",
-  high: "bg-orange-100 text-orange-700 border-orange-200",
-  critical: "bg-red-100 text-red-700 border-red-200",
+  LOW: "bg-blue-100 text-blue-700 border-blue-200",
+  MEDIUM: "bg-yellow-100 text-yellow-700 border-yellow-200",
+  HIGH: "bg-orange-100 text-orange-700 border-orange-200",
+  CRITICAL: "bg-red-100 text-red-700 border-red-200",
 }
 
 const urgencyLabels: Record<string, string> = {
-  low: "Baja",
-  medium: "Media",
-  high: "Alta",
-  critical: "Crítica",
+  LOW: "Baja",
+  MEDIUM: "Media",
+  HIGH: "Alta",
+  CRITICAL: "Crítica",
 }
 
 const statusColors: Record<string, string> = {
-  scheduled: "bg-blue-100 text-blue-700 border-blue-200",
-  resolving: "bg-yellow-100 text-yellow-700 border-yellow-200",
-  resolved: "bg-green-100 text-green-700 border-green-200",
+  SCHEDULED: "bg-blue-100 text-blue-700 border-blue-200",
+  RESOLVING: "bg-yellow-100 text-yellow-700 border-yellow-200",
+  RESOLVED: "bg-green-100 text-green-700 border-green-200",
 }
 
 const statusLabels: Record<string, string> = {
-  scheduled: "Programado",
-  resolving: "En progreso",
-  resolved: "Resuelto",
+  SCHEDULED: "Programado",
+  RESOLVING: "En progreso",
+  RESOLVED: "Resuelto",
 }
 
-const statusIcons: Record<string, React.ReactNode> = {
-  scheduled: <Clock className="w-4 h-4" />,
-  resolving: <Wrench className="w-4 h-4" />,
-  resolved: <CheckCircle className="w-4 h-4" />,
+const scheduleStatusLabels: Record<string, string> = {
+  SCHEDULED: "Programado",
+  ACTIVE: "Activo",
+  DONE: "Completado",
+}
+
+const scheduleStatusColors: Record<string, string> = {
+  SCHEDULED: "bg-blue-100 text-blue-700",
+  ACTIVE: "bg-green-100 text-green-700",
+  DONE: "bg-gray-100 text-gray-700",
+}
+
+const frequencyLabels: Record<string, string> = {
+  DAILY: "Diario",
+  WEEKLY: "Semanal",
+  MONTHLY: "Mensual",
+  YEARLY: "Anual",
 }
 
 export default function MaintenancePage() {
+  const { user } = useAuth()
+  const [maintenances, setMaintenances] = useState<MaintenanceResponse[]>([])
+  const [properties, setProperties] = useState<Property[]>([])
+  const [selectedPropertyId, setSelectedPropertyId] = useState("")
+  const [schedules, setSchedules] = useState<MaintenanceScheduleResponse[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [urgencyFilter, setUrgencyFilter] = useState("all")
-  const [isNewRequestOpen, setIsNewRequestOpen] = useState(false)
-  const [selectedRequest, setSelectedRequest] = useState<typeof maintenanceRequests[0] | null>(null)
+  const [selectedMaintenance, setSelectedMaintenance] = useState<MaintenanceResponse | null>(null)
+  const [showDetailDialog, setShowDetailDialog] = useState(false)
+  const [showScheduleDialog, setShowScheduleDialog] = useState(false)
+  const [confirmForm, setConfirmForm] = useState({
+    scheduledStart: "",
+    scheduledEnd: "",
+    blockCalendar: false,
+  })
+  const [resolveForm, setResolveForm] = useState({ resolutionNotes: "" })
+  const [scheduleForm, setScheduleForm] = useState({
+    title: "",
+    description: "",
+    frequency: "MONTHLY" as MaintenanceScheduleFrequency,
+    interval: 1,
+    nextScheduledDate: "",
+  })
+  const [isConfirming, setIsConfirming] = useState(false)
+  const [isResolving, setIsResolving] = useState(false)
+  const [isCreatingSchedule, setIsCreatingSchedule] = useState(false)
 
-  const filteredRequests = maintenanceRequests.filter((request) => {
+  useEffect(() => {
+    maintenanceService.getAll().then((res) => setMaintenances(res.data)).catch(() => {})
+    if (user?.id) {
+      propertyService
+        .getByLandlord(user.id, 0, 100)
+        .then((res) => setProperties(res.data))
+        .catch(() => {})
+    }
+  }, [user?.id])
+
+  useEffect(() => {
+    if (!selectedPropertyId) return
+    maintenanceService
+      .getSchedulesByProperty(selectedPropertyId)
+      .then((res) => setSchedules(res.data))
+      .catch(() => {})
+  }, [selectedPropertyId])
+
+  const filteredMaintenances = maintenances.filter((m) => {
+    const term = searchTerm.toLowerCase()
     const matchesSearch =
-      request.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      request.property.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      request.title.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = statusFilter === "all" || request.status === statusFilter
-    const matchesUrgency = urgencyFilter === "all" || request.urgency === urgencyFilter
+      m.title.toLowerCase().includes(term) ||
+      (m.description?.toLowerCase().includes(term) ?? false)
+    const matchesStatus = statusFilter === "all" || m.maintenanceStatus === statusFilter
+    const matchesUrgency = urgencyFilter === "all" || m.urgency === urgencyFilter
     return matchesSearch && matchesStatus && matchesUrgency
   })
+
+  const stats = {
+    scheduled: maintenances.filter((m) => m.maintenanceStatus === "SCHEDULED").length,
+    resolving: maintenances.filter((m) => m.maintenanceStatus === "RESOLVING").length,
+    resolved: maintenances.filter((m) => m.maintenanceStatus === "RESOLVED").length,
+    critical: maintenances.filter(
+      (m) => m.urgency === "CRITICAL" && m.maintenanceStatus !== "RESOLVED"
+    ).length,
+  }
+
+  const handleConfirm = async () => {
+    if (!selectedMaintenance || !confirmForm.scheduledStart || !confirmForm.scheduledEnd) return
+    setIsConfirming(true)
+    try {
+      const res = await maintenanceService.confirm(selectedMaintenance.id, {
+        scheduledStart: confirmForm.scheduledStart,
+        scheduledEnd: confirmForm.scheduledEnd,
+        blockCalendar: confirmForm.blockCalendar,
+      })
+      setMaintenances((prev) =>
+        prev.map((m) => (m.id === selectedMaintenance.id ? res.data : m))
+      )
+      setSelectedMaintenance(res.data)
+      setShowDetailDialog(false)
+      setConfirmForm({ scheduledStart: "", scheduledEnd: "", blockCalendar: false })
+    } catch {
+      // TODO: show error toast
+    } finally {
+      setIsConfirming(false)
+    }
+  }
+
+  const handleResolve = async () => {
+    if (!selectedMaintenance) return
+    setIsResolving(true)
+    try {
+      const res = await maintenanceService.resolve(selectedMaintenance.id, {
+        resolutionNotes: resolveForm.resolutionNotes || undefined,
+        photoUrls: [], // TODO: wire photo upload
+      })
+      setMaintenances((prev) =>
+        prev.map((m) => (m.id === selectedMaintenance.id ? res.data : m))
+      )
+      setSelectedMaintenance(res.data)
+      setShowDetailDialog(false)
+      setResolveForm({ resolutionNotes: "" })
+    } catch {
+      // TODO: show error toast
+    } finally {
+      setIsResolving(false)
+    }
+  }
+
+  const handleCreateSchedule = async () => {
+    if (!selectedPropertyId || !scheduleForm.title || !scheduleForm.nextScheduledDate) return
+    setIsCreatingSchedule(true)
+    try {
+      const res = await maintenanceService.createSchedule({
+        propertyId: selectedPropertyId,
+        title: scheduleForm.title,
+        description: scheduleForm.description || undefined,
+        frequency: scheduleForm.frequency,
+        interval: scheduleForm.interval,
+        nextScheduledDate: scheduleForm.nextScheduledDate + ":00",
+      })
+      setSchedules((prev) => [...prev, res.data])
+      setShowScheduleDialog(false)
+      setScheduleForm({
+        title: "",
+        description: "",
+        frequency: "MONTHLY",
+        interval: 1,
+        nextScheduledDate: "",
+      })
+    } catch {
+      // TODO: show error toast
+    } finally {
+      setIsCreatingSchedule(false)
+    }
+  }
+
+  const handleTriggerSchedule = async (scheduleId: string) => {
+    try {
+      await maintenanceService.triggerSchedule(scheduleId)
+      maintenanceService.getAll().then((res) => setMaintenances(res.data)).catch(() => {})
+    } catch {
+      // TODO: show error toast
+    }
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -153,106 +248,35 @@ export default function MaintenancePage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Mantenimiento</h1>
-          <p className="text-muted-foreground">Gestiona las solicitudes de reparación y mantenimiento</p>
+          <p className="text-muted-foreground">
+            Gestiona las solicitudes de reparación y mantenimiento
+          </p>
         </div>
-        <Dialog open={isNewRequestOpen} onOpenChange={setIsNewRequestOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-primary hover:bg-primary/90">
-              <Plus className="w-4 h-4 mr-2" />
-              Nueva Solicitud
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Nueva Solicitud de Mantenimiento</DialogTitle>
-            </DialogHeader>
-            <form className="space-y-4">
-              <div className="space-y-2">
-                <Label className="text-xs uppercase text-muted-foreground font-medium">Propiedad</Label>
-                <Select>
-                  <SelectTrigger className="bg-input">
-                    <SelectValue placeholder="Selecciona una propiedad" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">Apartamento Centro Histórico</SelectItem>
-                    <SelectItem value="2">Casa de Playa Costa del Sol</SelectItem>
-                    <SelectItem value="3">Loft Moderno Zona Rosa</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs uppercase text-muted-foreground font-medium">Título</Label>
-                <Input placeholder="Describe brevemente el problema" className="bg-input" />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs uppercase text-muted-foreground font-medium">Descripción</Label>
-                <Textarea placeholder="Proporciona más detalles..." rows={3} className="bg-input" />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs uppercase text-muted-foreground font-medium">Urgencia</Label>
-                <Select>
-                  <SelectTrigger className="bg-input">
-                    <SelectValue placeholder="Selecciona la urgencia" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Baja</SelectItem>
-                    <SelectItem value="medium">Media</SelectItem>
-                    <SelectItem value="high">Alta</SelectItem>
-                    <SelectItem value="critical">Crítica</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs uppercase text-muted-foreground font-medium">Fotos (opcional)</Label>
-                <div className="border-2 border-dashed border-border rounded-lg p-4 text-center">
-                  <Image className="w-8 h-8 mx-auto text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground mt-2">Arrastra fotos o haz clic para subir</p>
-                </div>
-              </div>
-              <div className="flex gap-2 pt-4">
-                <Button type="button" variant="outline" className="flex-1" onClick={() => setIsNewRequestOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button type="submit" className="flex-1 bg-primary">
-                  Crear Solicitud
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="border-t-4 border-t-blue-500">
           <CardContent className="p-4 text-center">
-            <p className="text-2xl font-semibold text-blue-600">
-              {maintenanceRequests.filter((r) => r.status === "scheduled").length}
-            </p>
+            <p className="text-2xl font-semibold text-blue-600">{stats.scheduled}</p>
             <p className="text-sm text-muted-foreground">Programados</p>
           </CardContent>
         </Card>
         <Card className="border-t-4 border-t-yellow-500">
           <CardContent className="p-4 text-center">
-            <p className="text-2xl font-semibold text-yellow-600">
-              {maintenanceRequests.filter((r) => r.status === "resolving").length}
-            </p>
+            <p className="text-2xl font-semibold text-yellow-600">{stats.resolving}</p>
             <p className="text-sm text-muted-foreground">En Progreso</p>
           </CardContent>
         </Card>
         <Card className="border-t-4 border-t-green-500">
           <CardContent className="p-4 text-center">
-            <p className="text-2xl font-semibold text-green-600">
-              {maintenanceRequests.filter((r) => r.status === "resolved").length}
-            </p>
+            <p className="text-2xl font-semibold text-green-600">{stats.resolved}</p>
             <p className="text-sm text-muted-foreground">Resueltos</p>
           </CardContent>
         </Card>
         <Card className="border-t-4 border-t-red-500">
           <CardContent className="p-4 text-center">
-            <p className="text-2xl font-semibold text-red-600">
-              {maintenanceRequests.filter((r) => r.urgency === "critical" && r.status !== "resolved").length}
-            </p>
+            <p className="text-2xl font-semibold text-red-600">{stats.critical}</p>
             <p className="text-sm text-muted-foreground">Urgentes</p>
           </CardContent>
         </Card>
@@ -265,7 +289,7 @@ export default function MaintenancePage() {
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder="Buscar por ID, propiedad o título..."
+                placeholder="Buscar por título o descripción..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 bg-input"
@@ -277,9 +301,9 @@ export default function MaintenancePage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="scheduled">Programado</SelectItem>
-                <SelectItem value="resolving">En progreso</SelectItem>
-                <SelectItem value="resolved">Resuelto</SelectItem>
+                <SelectItem value="SCHEDULED">Programado</SelectItem>
+                <SelectItem value="RESOLVING">En progreso</SelectItem>
+                <SelectItem value="RESOLVED">Resuelto</SelectItem>
               </SelectContent>
             </Select>
             <Select value={urgencyFilter} onValueChange={setUrgencyFilter}>
@@ -288,10 +312,10 @@ export default function MaintenancePage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas</SelectItem>
-                <SelectItem value="low">Baja</SelectItem>
-                <SelectItem value="medium">Media</SelectItem>
-                <SelectItem value="high">Alta</SelectItem>
-                <SelectItem value="critical">Crítica</SelectItem>
+                <SelectItem value="LOW">Baja</SelectItem>
+                <SelectItem value="MEDIUM">Media</SelectItem>
+                <SelectItem value="HIGH">Alta</SelectItem>
+                <SelectItem value="CRITICAL">Crítica</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -304,174 +328,453 @@ export default function MaintenancePage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>ID</TableHead>
-                <TableHead>Propiedad</TableHead>
                 <TableHead>Problema</TableHead>
                 <TableHead>Urgencia</TableHead>
-                <TableHead>Reportado por</TableHead>
                 <TableHead>Estado</TableHead>
-                <TableHead>Fecha</TableHead>
                 <TableHead>Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredRequests.map((request) => (
-                <TableRow key={request.id}>
-                  <TableCell className="font-medium">{request.id}</TableCell>
-                  <TableCell className="max-w-[150px] truncate">{request.property}</TableCell>
-                  <TableCell>
-                    <p className="font-medium">{request.title}</p>
-                    <p className="text-xs text-muted-foreground truncate max-w-[200px]">
-                      {request.description}
-                    </p>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={urgencyColors[request.urgency]}>
-                      {request.urgency === "critical" && <AlertTriangle className="w-3 h-3 mr-1" />}
-                      {urgencyLabels[request.urgency]}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <p className="text-sm">{request.reportedBy}</p>
-                    <p className="text-xs text-muted-foreground capitalize">{request.reportedByRole === "tenant" ? "Inquilino" : "Propietario"}</p>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={statusColors[request.status]}>
-                      <span className="flex items-center gap-1">
-                        {statusIcons[request.status]}
-                        {statusLabels[request.status]}
-                      </span>
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-sm">{request.createdAt}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button variant="ghost" size="icon" onClick={() => setSelectedRequest(request)}>
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-2xl">
-                          <DialogHeader>
-                            <DialogTitle>Solicitud {request.id}</DialogTitle>
-                          </DialogHeader>
-                          <div className="space-y-6">
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <p className="text-sm text-muted-foreground">Propiedad</p>
-                                <p className="font-medium">{request.property}</p>
-                              </div>
-                              <div>
-                                <p className="text-sm text-muted-foreground">Urgencia</p>
-                                <Badge className={urgencyColors[request.urgency]}>
-                                  {urgencyLabels[request.urgency]}
-                                </Badge>
-                              </div>
-                              <div className="col-span-2">
-                                <p className="text-sm text-muted-foreground">Problema</p>
-                                <p className="font-medium">{request.title}</p>
-                                <p className="text-sm text-muted-foreground mt-1">{request.description}</p>
-                              </div>
-                            </div>
-
-                            {request.requestPhotos.length > 0 && (
-                              <div>
-                                <p className="text-sm text-muted-foreground mb-2">Fotos del problema</p>
-                                <div className="flex gap-2">
-                                  {request.requestPhotos.map((photo, i) => (
-                                    <img key={i} src={photo} alt="" className="w-24 h-24 object-cover rounded-lg" />
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-
-                            {request.status === "scheduled" && (
-                              <div className="border-t pt-4">
-                                <h4 className="font-semibold mb-3">Programar Mantenimiento</h4>
-                                <div className="grid grid-cols-2 gap-4">
-                                  <div className="space-y-2">
-                                    <Label className="text-xs uppercase text-muted-foreground">Fecha Inicio</Label>
-                                    <Input type="datetime-local" className="bg-input" />
-                                  </div>
-                                  <div className="space-y-2">
-                                    <Label className="text-xs uppercase text-muted-foreground">Fecha Fin</Label>
-                                    <Input type="datetime-local" className="bg-input" />
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-2 mt-4">
-                                  <Checkbox id="blockCalendar" />
-                                  <Label htmlFor="blockCalendar" className="text-sm">Bloquear calendario durante el mantenimiento</Label>
-                                </div>
-                                <Button className="w-full mt-4 bg-primary">
-                                  <Play className="w-4 h-4 mr-2" />
-                                  Iniciar Mantenimiento
-                                </Button>
-                              </div>
-                            )}
-
-                            {request.status === "resolving" && (
-                              <div className="border-t pt-4">
-                                <h4 className="font-semibold mb-3">Marcar como Resuelto</h4>
-                                <div className="space-y-4">
-                                  <div className="space-y-2">
-                                    <Label className="text-xs uppercase text-muted-foreground">Notas de resolución</Label>
-                                    <Textarea placeholder="Describe el trabajo realizado..." rows={3} className="bg-input" />
-                                  </div>
-                                  <div className="space-y-2">
-                                    <Label className="text-xs uppercase text-muted-foreground">Fotos de respuesta</Label>
-                                    <div className="border-2 border-dashed border-border rounded-lg p-4 text-center">
-                                      <Image className="w-8 h-8 mx-auto text-muted-foreground" />
-                                      <p className="text-sm text-muted-foreground mt-2">Sube fotos del trabajo completado</p>
-                                    </div>
-                                  </div>
-                                  <Button className="w-full bg-green-600 hover:bg-green-700">
-                                    <CheckCircle className="w-4 h-4 mr-2" />
-                                    Marcar como Resuelto
-                                  </Button>
-                                </div>
-                              </div>
-                            )}
-
-                            {request.status === "resolved" && request.resolutionNotes && (
-                              <div className="border-t pt-4">
-                                <h4 className="font-semibold mb-2">Resolución</h4>
-                                <p className="text-sm text-muted-foreground">{request.resolutionNotes}</p>
-                                {request.responsePhotos.length > 0 && (
-                                  <div className="mt-3">
-                                    <p className="text-sm text-muted-foreground mb-2">Fotos de resolución</p>
-                                    <div className="flex gap-2">
-                                      {request.responsePhotos.map((photo, i) => (
-                                        <img key={i} src={photo} alt="" className="w-24 h-24 object-cover rounded-lg" />
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                      {request.status === "scheduled" && (
-                        <Button size="sm" variant="outline">
-                          <Play className="w-4 h-4 mr-1" />
-                          Iniciar
-                        </Button>
-                      )}
-                      {request.status === "resolving" && (
-                        <Button size="sm" className="bg-green-600 hover:bg-green-700">
-                          <CheckCircle className="w-4 h-4 mr-1" />
-                          Resolver
-                        </Button>
-                      )}
-                    </div>
+              {filteredMaintenances.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="py-12 text-center text-muted-foreground">
+                    <Wrench className="mx-auto mb-2 h-8 w-8 opacity-50" />
+                    No hay solicitudes de mantenimiento
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                filteredMaintenances.map((m) => (
+                  <TableRow key={m.id}>
+                    <TableCell>
+                      <p className="font-medium">{m.title}</p>
+                      {m.description && (
+                        <p className="text-xs text-muted-foreground truncate max-w-[250px]">
+                          {m.description}
+                        </p>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={urgencyColors[m.urgency]}>
+                        {m.urgency === "CRITICAL" && (
+                          <AlertTriangle className="w-3 h-3 mr-1" />
+                        )}
+                        {urgencyLabels[m.urgency]}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={statusColors[m.maintenanceStatus]}>
+                        <span className="flex items-center gap-1">
+                          {m.maintenanceStatus === "SCHEDULED" && <Clock className="w-3 h-3" />}
+                          {m.maintenanceStatus === "RESOLVING" && <Wrench className="w-3 h-3" />}
+                          {m.maintenanceStatus === "RESOLVED" && <CheckCircle className="w-3 h-3" />}
+                          {statusLabels[m.maintenanceStatus]}
+                        </span>
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setSelectedMaintenance(m)
+                            setShowDetailDialog(true)
+                          }}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        {m.maintenanceStatus === "SCHEDULED" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedMaintenance(m)
+                              setShowDetailDialog(true)
+                            }}
+                          >
+                            <Play className="w-4 h-4 mr-1" />
+                            Iniciar
+                          </Button>
+                        )}
+                        {m.maintenanceStatus === "RESOLVING" && (
+                          <Button
+                            size="sm"
+                            className="bg-green-600 hover:bg-green-700"
+                            onClick={() => {
+                              setSelectedMaintenance(m)
+                              setShowDetailDialog(true)
+                            }}
+                          >
+                            <CheckCircle className="w-4 h-4 mr-1" />
+                            Resolver
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
+
+      {/* Preventive Schedules Section */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold">Mantenimiento Preventivo</h2>
+            <p className="text-sm text-muted-foreground">
+              Programa mantenimientos periódicos para tus propiedades
+            </p>
+          </div>
+          {selectedPropertyId && (
+            <Button onClick={() => setShowScheduleDialog(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Nueva Programación
+            </Button>
+          )}
+        </div>
+
+        <Card className="border-t-4 border-t-primary">
+          <CardContent className="p-4 space-y-4">
+            <div>
+              <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Selecciona una propiedad
+              </Label>
+              <Select value={selectedPropertyId} onValueChange={setSelectedPropertyId}>
+                <SelectTrigger className="mt-1 bg-input">
+                  <SelectValue placeholder="Elige una propiedad para ver sus programaciones" />
+                </SelectTrigger>
+                <SelectContent>
+                  {properties.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {selectedPropertyId && (
+              <div className="space-y-3">
+                {schedules.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                    <Calendar className="mb-2 h-8 w-8 opacity-50" />
+                    <p>No hay programaciones para esta propiedad</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-3"
+                      onClick={() => setShowScheduleDialog(true)}
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      Crear primera programación
+                    </Button>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Título</TableHead>
+                        <TableHead>Frecuencia</TableHead>
+                        <TableHead>Próxima fecha</TableHead>
+                        <TableHead>Última ejecución</TableHead>
+                        <TableHead>Estado</TableHead>
+                        <TableHead>Acciones</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {schedules.map((s) => (
+                        <TableRow key={s.id}>
+                          <TableCell>
+                            <p className="font-medium">{s.title}</p>
+                            {s.description && (
+                              <p className="text-xs text-muted-foreground truncate max-w-[200px]">
+                                {s.description}
+                              </p>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {frequencyLabels[s.frequency]} (c/ {s.interval})
+                          </TableCell>
+                          <TableCell className="text-sm">{s.nextScheduleDate}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {s.lastCompletedAt ?? "—"}
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={scheduleStatusColors[s.status]}>
+                              {scheduleStatusLabels[s.status]}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleTriggerSchedule(s.id)}
+                            >
+                              <RefreshCw className="w-4 h-4 mr-1" />
+                              Ejecutar ahora
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Detail / Confirm / Resolve Dialog */}
+      <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedMaintenance?.maintenanceStatus === "SCHEDULED"
+                ? "Programar Mantenimiento"
+                : selectedMaintenance?.maintenanceStatus === "RESOLVING"
+                ? "Marcar como Resuelto"
+                : "Detalle de Mantenimiento"}
+            </DialogTitle>
+          </DialogHeader>
+          {selectedMaintenance && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Problema</p>
+                  <p className="font-medium">{selectedMaintenance.title}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Urgencia</p>
+                  <Badge className={urgencyColors[selectedMaintenance.urgency]}>
+                    {urgencyLabels[selectedMaintenance.urgency]}
+                  </Badge>
+                </div>
+                {selectedMaintenance.description && (
+                  <div className="col-span-2">
+                    <p className="text-sm text-muted-foreground">Descripción</p>
+                    <p className="text-sm">{selectedMaintenance.description}</p>
+                  </div>
+                )}
+              </div>
+
+              {selectedMaintenance.photoUrls.length > 0 && (
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">Fotos del problema</p>
+                  <div className="flex gap-2">
+                    {selectedMaintenance.photoUrls.map((url, i) => (
+                      <img
+                        key={i}
+                        src={url}
+                        alt=""
+                        className="w-24 h-24 object-cover rounded-lg"
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedMaintenance.maintenanceStatus === "SCHEDULED" && (
+                <div className="border-t pt-4 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-xs uppercase text-muted-foreground">
+                        Fecha Inicio
+                      </Label>
+                      <Input
+                        type="datetime-local"
+                        className="bg-input"
+                        value={confirmForm.scheduledStart}
+                        onChange={(e) =>
+                          setConfirmForm({ ...confirmForm, scheduledStart: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs uppercase text-muted-foreground">Fecha Fin</Label>
+                      <Input
+                        type="datetime-local"
+                        className="bg-input"
+                        value={confirmForm.scheduledEnd}
+                        onChange={(e) =>
+                          setConfirmForm({ ...confirmForm, scheduledEnd: e.target.value })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="blockCalendar"
+                      checked={confirmForm.blockCalendar}
+                      onCheckedChange={(v) =>
+                        setConfirmForm({ ...confirmForm, blockCalendar: !!v })
+                      }
+                    />
+                    <Label htmlFor="blockCalendar" className="text-sm">
+                      Bloquear calendario durante el mantenimiento
+                    </Label>
+                  </div>
+                  <Button
+                    className="w-full bg-primary"
+                    onClick={handleConfirm}
+                    disabled={
+                      isConfirming ||
+                      !confirmForm.scheduledStart ||
+                      !confirmForm.scheduledEnd
+                    }
+                  >
+                    <Play className="w-4 h-4 mr-2" />
+                    {isConfirming ? "Iniciando..." : "Iniciar Mantenimiento"}
+                  </Button>
+                </div>
+              )}
+
+              {selectedMaintenance.maintenanceStatus === "RESOLVING" && (
+                <div className="border-t pt-4 space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs uppercase text-muted-foreground">
+                      Notas de resolución
+                    </Label>
+                    <Textarea
+                      placeholder="Describe el trabajo realizado..."
+                      rows={3}
+                      className="bg-input"
+                      value={resolveForm.resolutionNotes}
+                      onChange={(e) =>
+                        setResolveForm({ resolutionNotes: e.target.value })
+                      }
+                    />
+                  </div>
+                  {/* TODO: wire photo upload for response photos */}
+                  <Button
+                    className="w-full bg-green-600 hover:bg-green-700"
+                    onClick={handleResolve}
+                    disabled={isResolving}
+                  >
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    {isResolving ? "Guardando..." : "Marcar como Resuelto"}
+                  </Button>
+                </div>
+              )}
+
+              {selectedMaintenance.maintenanceStatus === "RESOLVED" &&
+                selectedMaintenance.resolutionNotes && (
+                  <div className="border-t pt-4">
+                    <h4 className="font-semibold mb-2">Resolución</h4>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedMaintenance.resolutionNotes}
+                    </p>
+                  </div>
+                )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Schedule Dialog */}
+      <Dialog open={showScheduleDialog} onOpenChange={setShowScheduleDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Nueva Programación de Mantenimiento</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-xs uppercase text-muted-foreground font-medium">Título</Label>
+              <Input
+                placeholder="Ej: Revisión de instalaciones eléctricas"
+                className="bg-input"
+                value={scheduleForm.title}
+                onChange={(e) => setScheduleForm({ ...scheduleForm, title: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs uppercase text-muted-foreground font-medium">
+                Descripción
+              </Label>
+              <Textarea
+                placeholder="Detalla qué incluye este mantenimiento..."
+                rows={3}
+                className="bg-input"
+                value={scheduleForm.description}
+                onChange={(e) =>
+                  setScheduleForm({ ...scheduleForm, description: e.target.value })
+                }
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-xs uppercase text-muted-foreground font-medium">
+                  Frecuencia
+                </Label>
+                <Select
+                  value={scheduleForm.frequency}
+                  onValueChange={(v: MaintenanceScheduleFrequency) =>
+                    setScheduleForm({ ...scheduleForm, frequency: v })
+                  }
+                >
+                  <SelectTrigger className="bg-input">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="DAILY">Diario</SelectItem>
+                    <SelectItem value="WEEKLY">Semanal</SelectItem>
+                    <SelectItem value="MONTHLY">Mensual</SelectItem>
+                    <SelectItem value="YEARLY">Anual</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs uppercase text-muted-foreground font-medium">
+                  Intervalo
+                </Label>
+                <Input
+                  type="number"
+                  min={1}
+                  className="bg-input"
+                  value={scheduleForm.interval}
+                  onChange={(e) =>
+                    setScheduleForm({ ...scheduleForm, interval: Number(e.target.value) })
+                  }
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs uppercase text-muted-foreground font-medium">
+                Próxima fecha programada
+              </Label>
+              <Input
+                type="datetime-local"
+                className="bg-input"
+                value={scheduleForm.nextScheduledDate}
+                onChange={(e) =>
+                  setScheduleForm({ ...scheduleForm, nextScheduledDate: e.target.value })
+                }
+              />
+            </div>
+          </div>
+          <div className="flex gap-2 pt-2">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => setShowScheduleDialog(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              className="flex-1 bg-primary"
+              onClick={handleCreateSchedule}
+              disabled={
+                isCreatingSchedule || !scheduleForm.title || !scheduleForm.nextScheduledDate
+              }
+            >
+              {isCreatingSchedule ? "Creando..." : "Crear Programación"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

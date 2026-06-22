@@ -89,6 +89,39 @@ export type ContractDetailResponse = {
   landlordName: string;
 };
 
+export type MaintenanceStatus = "SCHEDULED" | "RESOLVING" | "RESOLVED"
+
+export type Urgency = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
+
+export type MaintenanceResponse = {
+  id: string;
+  propertyId: string | null;
+  reservationId: string | null;
+  reportedId: string | null;
+  title: string;
+  description: string | null;
+  urgency: Urgency;
+  resolutionNotes: string | null;
+  maintenanceStatus: MaintenanceStatus;
+  photoUrls: string[];
+}
+
+export type MaintenanceScheduleFrequency = "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY"
+export type MaintenanceScheduleStatus = "SCHEDULED" | "ACTIVE" | "DONE"
+
+export type MaintenanceScheduleResponse = {
+  id: string;
+  propertyId: string | null;
+  scheduledBy: string | null;
+  title: string;
+  description: string | null;
+  frequency: MaintenanceScheduleFrequency;
+  interval: number;
+  lastCompletedAt: string | null;
+  nextScheduleDate: string;
+  status: MaintenanceScheduleStatus;
+}
+
 export type Property = {
   id: string;
   landlordId: string;
