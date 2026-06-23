@@ -1,14 +1,16 @@
+'use client'
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { CalendarDays, FileText, Key, Wrench, Star, ArrowRight, Home, Clock } from 'lucide-react'
 import Link from 'next/link'
-import { 
-  currentUser, 
-  mockReservations, 
-  mockContracts, 
-  mockMaintenanceRequests, 
-  mockNotifications 
+import { useAuth } from '@/lib/contexts/auth-context'
+import {
+  mockReservations,
+  mockContracts,
+  mockMaintenanceRequests,
+  mockNotifications
 } from '@/lib/mock-data'
 
 const statusColors = {
@@ -26,6 +28,7 @@ const statusLabels = {
 }
 
 export default function TenantDashboard() {
+  const { user } = useAuth()
   const activeReservations = mockReservations.filter(
     r => r.reservationStatus === 'active' || r.reservationStatus === 'reserved'
   )
@@ -40,7 +43,7 @@ export default function TenantDashboard() {
       {/* Welcome Section */}
       <div className="rounded-xl bg-gradient-to-r from-primary/10 to-secondary p-6">
         <h1 className="text-2xl font-bold text-foreground">
-          Bienvenido, {currentUser.name.split(' ')[0]}
+          Bienvenido, {user?.name?.split(' ')[0]}
         </h1>
         <p className="mt-1 text-muted-foreground">
           Aquí tienes un resumen de tu actividad en RentFlow
@@ -91,7 +94,7 @@ export default function TenantDashboard() {
               <Star className="h-6 w-6 text-green-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{currentUser.averageRating}</p>
+              <p className="text-2xl font-bold">—</p>
               <p className="text-sm text-muted-foreground">Mi Calificación</p>
             </div>
           </CardContent>

@@ -16,6 +16,7 @@ import {
   Star,
   Wrench,
 } from "lucide-react"
+import { useAuth } from "@/lib/contexts/auth-context"
 
 // Mock data
 const stats = [
@@ -44,13 +45,14 @@ const notifications = [
 ]
 
 export default function LandlordDashboard() {
+  const { user } = useAuth()
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Panel de Propietario</h1>
-          <p className="text-muted-foreground">Bienvenido de nuevo, Juan</p>
+          <p className="text-muted-foreground">Bienvenido de nuevo, {user?.name?.split(' ')[0]}</p>
         </div>
         <Link href="/propietario/propiedades/nueva">
           <Button className="bg-primary hover:bg-primary/90">
