@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -43,6 +43,8 @@ import {
 import { Checkbox } from "@/components/ui/checkbox"
 import { maintenanceService } from "@/lib/services/maintenance.service"
 import { propertyService } from "@/lib/services/property.service"
+import { uploadService } from "@/lib/services/upload.service"
+import { useToast } from "@/hooks/use-toast"
 import {
   MaintenanceResponse,
   MaintenanceScheduleResponse,
@@ -98,6 +100,7 @@ const frequencyLabels: Record<string, string> = {
 
 export default function MaintenancePage() {
   const { user } = useAuth()
+  const { toast } = useToast()
   const [maintenances, setMaintenances] = useState<MaintenanceResponse[]>([])
   const [properties, setProperties] = useState<Property[]>([])
   const [selectedPropertyId, setSelectedPropertyId] = useState("")
@@ -124,6 +127,9 @@ export default function MaintenancePage() {
   const [isConfirming, setIsConfirming] = useState(false)
   const [isResolving, setIsResolving] = useState(false)
   const [isCreatingSchedule, setIsCreatingSchedule] = useState(false)
+  const [resolvePhotos, setResolvePhotos] = useState<Array<{ url: string; publicId: string }>>([])
+  const [isUploadingResolve, setIsUploadingResolve] = useState(false)
+  const resolveFileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     maintenanceService.getAll().then((res) => setMaintenances(res.data)).catch(() => {})
@@ -177,11 +183,24 @@ export default function MaintenancePage() {
       setSelectedMaintenance(res.data)
       setShowDetailDialog(false)
       setConfirmForm({ scheduledStart: "", scheduledEnd: "", blockCalendar: false })
-    } catch {
-      // TODO: show error toast
+    } catch (err: unknown) {
+      toast({ title: "Error al confirmar", description: err instanceof Error ? err.message : "No se pudo confirmar el mantenimiento.", variant: "destructive" })
     } finally {
       setIsConfirming(false)
     }
+  }
+
+  const handleResolveFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? [])
+    if (!files.length) return
+    setIsUploadingResolve(true)
+    const results = await Promise.allSettled(files.map((f) => uploadService.uploadImage(f)))
+    const uploaded = results
+      .filter((r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof uploadService.uploadImage>>> => r.status === "fulfilled")
+      .map((r) => ({ url: r.value.data.url, publicId: r.value.data.publicId }))
+    setResolvePhotos((prev) => [...prev, ...uploaded])
+    setIsUploadingResolve(false)
+    e.target.value = ""
   }
 
   const handleResolve = async () => {
@@ -190,7 +209,7 @@ export default function MaintenancePage() {
     try {
       const res = await maintenanceService.resolve(selectedMaintenance.id, {
         resolutionNotes: resolveForm.resolutionNotes || undefined,
-        photoUrls: [], // TODO: wire photo upload
+        photoUrls: resolvePhotos,
       })
       setMaintenances((prev) =>
         prev.map((m) => (m.id === selectedMaintenance.id ? res.data : m))
@@ -198,8 +217,9 @@ export default function MaintenancePage() {
       setSelectedMaintenance(res.data)
       setShowDetailDialog(false)
       setResolveForm({ resolutionNotes: "" })
-    } catch {
-      // TODO: show error toast
+      setResolvePhotos([])
+    } catch (err: unknown) {
+      toast({ title: "Error al resolver", description: err instanceof Error ? err.message : "No se pudo resolver el mantenimiento.", variant: "destructive" })
     } finally {
       setIsResolving(false)
     }
@@ -226,8 +246,8 @@ export default function MaintenancePage() {
         interval: 1,
         nextScheduledDate: "",
       })
-    } catch {
-      // TODO: show error toast
+    } catch (err: unknown) {
+      toast({ title: "Error al crear programa", description: err instanceof Error ? err.message : "No se pudo crear el programa de mantenimiento.", variant: "destructive" })
     } finally {
       setIsCreatingSchedule(false)
     }
@@ -237,8 +257,8 @@ export default function MaintenancePage() {
     try {
       await maintenanceService.triggerSchedule(scheduleId)
       maintenanceService.getAll().then((res) => setMaintenances(res.data)).catch(() => {})
-    } catch {
-      // TODO: show error toast
+    } catch (err: unknown) {
+      toast({ title: "Error al ejecutar", description: err instanceof Error ? err.message : "No se pudo ejecutar el mantenimiento.", variant: "destructive" })
     }
   }
 
@@ -498,7 +518,7 @@ export default function MaintenancePage() {
                           <TableCell>
                             {frequencyLabels[s.frequency]} (c/ {s.interval})
                           </TableCell>
-                          <TableCell className="text-sm">{s.nextScheduleDate}</TableCell>
+                          <TableCell className="text-sm">{s.nextScheduledDate}</TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {s.lastCompletedAt ?? "—"}
                           </TableCell>
@@ -648,11 +668,33 @@ export default function MaintenancePage() {
                       }
                     />
                   </div>
-                  {/* TODO: wire photo upload for response photos */}
+                  <div>
+                    <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      Fotos de resolución
+                    </Label>
+                    <input
+                      ref={resolveFileInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      multiple
+                      className="hidden"
+                      onChange={handleResolveFileChange}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-1 w-full"
+                      onClick={() => resolveFileInputRef.current?.click()}
+                      disabled={isUploadingResolve}
+                    >
+                      {isUploadingResolve ? "Subiendo..." : `Adjuntar fotos${resolvePhotos.length > 0 ? ` (${resolvePhotos.length})` : ""}`}
+                    </Button>
+                  </div>
                   <Button
                     className="w-full bg-green-600 hover:bg-green-700"
                     onClick={handleResolve}
-                    disabled={isResolving}
+                    disabled={isResolving || isUploadingResolve}
                   >
                     <CheckCircle className="w-4 h-4 mr-2" />
                     {isResolving ? "Guardando..." : "Marcar como Resuelto"}

@@ -116,6 +116,8 @@ export type MaintenanceResponse = {
   description: string | null;
   urgency: Urgency;
   resolutionNotes: string | null;
+  scheduledStart: string | null;
+  scheduledEnd: string | null;
   maintenanceStatus: MaintenanceStatus;
   photoUrls: string[];
 }
@@ -132,7 +134,7 @@ export type MaintenanceScheduleResponse = {
   frequency: MaintenanceScheduleFrequency;
   interval: number;
   lastCompletedAt: string | null;
-  nextScheduleDate: string;
+  nextScheduledDate: string;
   status: MaintenanceScheduleStatus;
 }
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -33,6 +33,8 @@ import {
 } from 'lucide-react'
 import { maintenanceService } from '@/lib/services/maintenance.service'
 import { contractService } from '@/lib/services/contract.service'
+import { uploadService } from '@/lib/services/upload.service'
+import { useToast } from '@/hooks/use-toast'
 import { MaintenanceResponse, ContractDetailResponse, Urgency } from '@/types/api-responses'
 
 const statusColors: Record<string, string> = {
@@ -62,6 +64,7 @@ const urgencyLabels: Record<string, string> = {
 }
 
 export default function MaintenancePage() {
+  const { toast } = useToast()
   const [maintenances, setMaintenances] = useState<MaintenanceResponse[]>([])
   const [contracts, setContracts] = useState<ContractDetailResponse[]>([])
   const [showNewRequestDialog, setShowNewRequestDialog] = useState(false)
@@ -72,6 +75,9 @@ export default function MaintenancePage() {
     description: '',
     urgency: 'MEDIUM' as Urgency,
   })
+  const [createPhotos, setCreatePhotos] = useState<Array<{ url: string; publicId: string }>>([])
+  const [isUploadingCreate, setIsUploadingCreate] = useState(false)
+  const createFileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     maintenanceService.getAll().then((res) => setMaintenances(res.data)).catch(() => {})
@@ -85,6 +91,19 @@ export default function MaintenancePage() {
   const activeMaintenances = maintenances.filter((m) => m.maintenanceStatus !== 'RESOLVED')
   const resolvedMaintenances = maintenances.filter((m) => m.maintenanceStatus === 'RESOLVED')
 
+  const handleCreateFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? [])
+    if (!files.length) return
+    setIsUploadingCreate(true)
+    const results = await Promise.allSettled(files.map((f) => uploadService.uploadImage(f)))
+    const uploaded = results
+      .filter((r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof uploadService.uploadImage>>> => r.status === "fulfilled")
+      .map((r) => ({ url: r.value.data.url, publicId: r.value.data.publicId }))
+    setCreatePhotos((prev) => [...prev, ...uploaded])
+    setIsUploadingCreate(false)
+    e.target.value = ''
+  }
+
   const handleCreate = async () => {
     if (!newRequest.reservationId || !newRequest.title) return
     setIsSubmitting(true)
@@ -94,13 +113,14 @@ export default function MaintenancePage() {
         title: newRequest.title,
         description: newRequest.description || undefined,
         urgency: newRequest.urgency,
-        photoUrls: [], // TODO: wire photo upload
+        photoUrls: createPhotos,
       })
       setMaintenances((prev) => [res.data, ...prev])
       setShowNewRequestDialog(false)
       setNewRequest({ reservationId: '', title: '', description: '', urgency: 'MEDIUM' })
-    } catch {
-      // TODO: show error toast
+      setCreatePhotos([])
+    } catch (err: unknown) {
+      toast({ title: 'Error al enviar', description: err instanceof Error ? err.message : 'No se pudo enviar la solicitud.', variant: 'destructive' })
     } finally {
       setIsSubmitting(false)
     }
@@ -348,7 +368,29 @@ export default function MaintenancePage() {
                     </SelectContent>
                   </Select>
                 </div>
-                {/* TODO: wire photo upload */}
+                <div>
+                  <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Fotos del problema
+                  </Label>
+                  <input
+                    ref={createFileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    multiple
+                    className="hidden"
+                    onChange={handleCreateFileChange}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-1 w-full"
+                    onClick={() => createFileInputRef.current?.click()}
+                    disabled={isUploadingCreate}
+                  >
+                    {isUploadingCreate ? 'Subiendo...' : `Adjuntar fotos${createPhotos.length > 0 ? ` (${createPhotos.length})` : ''}`}
+                  </Button>
+                </div>
                 {newRequest.urgency === 'CRITICAL' && (
                   <div className="rounded-lg border border-red-200 bg-red-50 p-3">
                     <div className="flex items-start gap-2">
@@ -371,6 +413,7 @@ export default function MaintenancePage() {
               onClick={handleCreate}
               disabled={
                 isSubmitting ||
+                isUploadingCreate ||
                 contracts.length === 0 ||
                 !newRequest.reservationId ||
                 !newRequest.title

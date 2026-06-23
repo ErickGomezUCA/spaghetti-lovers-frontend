@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -51,6 +52,7 @@ const urgencyConfig: Record<
 }
 
 export default function AdminMaintenancePage() {
+  const router = useRouter()
   const [maintenances, setMaintenances] = useState<MaintenanceResponse[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<MaintenanceStatus | "all">("all")
@@ -283,8 +285,14 @@ export default function AdminMaintenancePage() {
                           <Eye className="w-4 h-4 mr-2" />
                           Ver detalles
                         </DropdownMenuItem>
-                        {/* TODO: navigate to property page */}
-                        {/* TODO: contact landlord */}
+                        <DropdownMenuItem
+                          onClick={() => item.propertyId && router.push(`/admin/propiedades/${item.propertyId}`)}
+                          disabled={!item.propertyId}
+                        >
+                          <Eye className="w-4 h-4 mr-2" />
+                          Ver propiedad
+                        </DropdownMenuItem>
+                        {/* TODO: contact landlord — needs messaging system */}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
