@@ -161,3 +161,44 @@ export type Property = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type ReservationStatus = "PENDING" | "RESERVED" | "ACTIVE" | "COMPLETED" | "CANCELLED";
+
+export type ReservationResponse = {
+  id: string;
+  propertyName: string;
+  tenantName: string;
+  tenantEmail: string;
+  checkInDate: string;
+  checkOutDate: string;
+  totalNights: number;
+  guestsCount: number;
+  totalPrice: number;
+  reservationStatus: ReservationStatus;
+};
+
+export type LandlordReservationSummaryResponse = {
+  reserved: number;
+  active: number;
+  completed: number;
+  cancelled: number;
+};
+
+export type ReservationDetailResponse = {
+  id: string;
+  checkInDate: string;
+  checkOutDate: string;
+  guestsCount: number;
+  totalNights: number;
+  baseTotal: number;
+  cleaningFee: number;
+  longStayDiscount: number;
+  totalPrice: number;
+  reservationStatus: string;
+  tenantName: string;
+  tenantEmail: string;
+  property: {
+    id: string;
+    title: string;
+  };
+};
