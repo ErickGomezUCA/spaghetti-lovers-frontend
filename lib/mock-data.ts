@@ -180,25 +180,24 @@ export const mockProperties: Property[] = [
 
 // Mock Reservations
 export const mockReservations: Reservation[] = [
-  {
-    id: 'r1',
-    propertyId: '1',
-    property: mockProperties[0],
-    tenantId: 't1',
-    checkInDate: '2026-06-15',
-    checkOutDate: '2026-06-20',
-    guestsCount: 2,
-    totalNights: 5,
-    baseTotal: 375,
-    cleaningFee: 25,
-    longStayDiscount: 0,
-    totalPrice: 550,
-    reservationStatus: 'reserved',
-    cancellationPenalty: 0,
-    paymentMethod: 'card',
-    createdAt: '2026-06-01',
-    accessCode: 'RF2024A1'
-  },
+    {
+        id: 'a03acafc-f237-4308-9773-2e83f6b56682',
+        propertyId: 'b66cd464-c738-4e1b-b6de-e9aaa4387d83',
+        property: mockProperties[0],
+        tenantId: 'ca09c576-3d08-4791-b6b3-83c3f6f589e7',
+        checkInDate: '2026-06-24',
+        checkOutDate: '2026-06-29',
+        guestsCount: 2,
+        totalNights: 5,
+        baseTotal: 325,
+        cleaningFee: 15,
+        longStayDiscount: 0,
+        totalPrice: 440,
+        reservationStatus: 'active',
+        cancellationPenalty: 0,
+        paymentMethod: 'card',
+        createdAt: '2026-06-24'
+    },
   {
     id: 'r2',
     propertyId: '2',
