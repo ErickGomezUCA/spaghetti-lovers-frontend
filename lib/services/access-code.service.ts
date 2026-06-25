@@ -1,5 +1,9 @@
 import { apiClient } from "@/lib/clients/api-client";
-import { AccessCode, ApiResponse } from "@/types/api-responses";
+import {
+    AccessCode,
+    AccessCodeDetailResponse,
+    ApiResponse,
+} from "@/types/api-responses";
 
 export const accessCodeService = {
     getByReservationId: (
@@ -7,5 +11,15 @@ export const accessCodeService = {
     ): Promise<ApiResponse<AccessCode>> =>
         apiClient.get<ApiResponse<AccessCode>>(
             `/reservations/${reservationId}/access-code`,
+        ),
+
+    getTenantAccessCodes: (): Promise<ApiResponse<AccessCodeDetailResponse[]>> =>
+        apiClient.get<ApiResponse<AccessCodeDetailResponse[]>>(
+            "/access-codes/tenant",
+        ),
+
+    getLandlordAccessCodes: (): Promise<ApiResponse<AccessCodeDetailResponse[]>> =>
+        apiClient.get<ApiResponse<AccessCodeDetailResponse[]>>(
+            "/access-codes/landlord",
         ),
 };
