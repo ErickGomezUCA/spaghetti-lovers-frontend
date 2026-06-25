@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { reservationService } from "@/lib/services/reservation.service";
+import { ReservationCancellationPreviewResponse } from "@/types/api-responses";
 import {
   Dialog,
   DialogContent,
@@ -67,17 +69,26 @@ export default function ReservationsPage() {
   const [showExtendDialog, setShowExtendDialog] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [newCheckoutDate, setNewCheckoutDate] = useState<Date | undefined>();
+  const [cancellationPreview, setCancellationPreview] =
+      useState<ReservationCancellationPreviewResponse | null>(null);
+  const [isLoadingCancellationPreview, setIsLoadingCancellationPreview] =
+      useState(false);
+  const [isCancellingReservation, setIsCancellingReservation] = useState(false);
+  const [cancellationError, setCancellationError] = useState<string | null>(null);
+  const [reservations, setReservations] = useState<Reservation[]>(mockReservations);
 
-  const activeReservations = mockReservations.filter(
-    (r) =>
-      r.reservationStatus === "active" || r.reservationStatus === "reserved",
-  );
-  const completedReservations = mockReservations.filter(
-    (r) => r.reservationStatus === "completed",
-  );
-  const cancelledReservations = mockReservations.filter(
-    (r) => r.reservationStatus === "cancelled",
-  );
+    const activeReservations = reservations.filter(
+        (r) =>
+            r.reservationStatus === "active" || r.reservationStatus === "reserved",
+    );
+
+    const completedReservations = reservations.filter(
+        (r) => r.reservationStatus === "completed",
+    );
+
+    const cancelledReservations = reservations.filter(
+        (r) => r.reservationStatus === "cancelled",
+    );
 
   const calculateExtensionCost = (reservation: Reservation, newDate: Date) => {
     const currentCheckout = new Date(reservation.checkOutDate);
@@ -87,32 +98,58 @@ export default function ReservationsPage() {
     return additionalNights * reservation.property.basePricePerNight;
   };
 
-  const calculateCancellationPenalty = (reservation: Reservation) => {
-    const checkIn = new Date(reservation.checkInDate);
-    const today = new Date();
-    const daysUntilCheckin = Math.ceil(
-      (checkIn.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
-    );
+    const handleOpenCancelDialog = async (reservation: Reservation) => {
+        setSelectedReservation(reservation);
+        setShowCancelDialog(true);
+        setCancellationPreview(null);
+        setCancellationError(null);
+        setIsLoadingCancellationPreview(true);
 
-    if (daysUntilCheckin >= 7) {
-      return {
-        penalty: 0,
-        refund: reservation.baseTotal,
-        message: "Reembolso completo del 100%",
-      };
-    } else if (daysUntilCheckin >= 3) {
-      return {
-        penalty: reservation.baseTotal * 0.5,
-        refund: reservation.baseTotal * 0.5,
-        message: "Penalización del 50%",
-      };
-    } else {
-      return {
-        penalty: reservation.baseTotal,
-        refund: 0,
-        message: "Sin reembolso (menos de 3 días)",
-      };
-    }
+        try {
+            const response = await reservationService.previewCancellation(reservation.id);
+            setCancellationPreview(response.data);
+        } catch (error) {
+            console.error("Error loading cancellation preview:", error);
+            setCancellationError(
+                "No se pudo cargar el resumen de cancelación para esta reserva.",
+            );
+        } finally {
+            setIsLoadingCancellationPreview(false);
+        }
+    };
+
+  const handleConfirmCancellation = async () => {
+      if (!selectedReservation) return;
+
+      setIsCancellingReservation(true);
+      setCancellationError(null);
+
+      try {
+          const response = await reservationService.cancelReservation(
+              selectedReservation.id,
+          );
+
+          setReservations((prev) =>
+              prev.map((reservation) =>
+                  reservation.id === response.data.reservationId
+                      ? {
+                          ...reservation,
+                          reservationStatus: "cancelled",
+                          cancellationPenalty: response.data.cancellationPenalty,
+                      }
+                      : reservation,
+              ),
+          );
+
+          setShowCancelDialog(false);
+          setSelectedReservation(null);
+          setCancellationPreview(null);
+      } catch (error) {
+          console.error("Error cancelling reservation:", error);
+          setCancellationError("No se pudo cancelar la reserva.");
+      } finally {
+          setIsCancellingReservation(false);
+      }
   };
 
   const ReservationCard = ({ reservation }: { reservation: Reservation }) => (
@@ -314,8 +351,7 @@ export default function ReservationsPage() {
               </DialogContent>
             </Dialog>
 
-            {(reservation.reservationStatus === "active" ||
-              reservation.reservationStatus === "reserved") && (
+            {(reservation.reservationStatus === "reserved") && (
               <>
                 {reservation.accessCode && (
                   <Button variant="outline" size="sm">
@@ -333,15 +369,12 @@ export default function ReservationsPage() {
                   Extender
                 </Button>
                 <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                  onClick={() => {
-                    setSelectedReservation(reservation);
-                    setShowCancelDialog(true);
-                  }}
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                    onClick={() => handleOpenCancelDialog(reservation)}
                 >
-                  Cancelar
+                    Cancelar
                 </Button>
               </>
             )}
@@ -572,48 +605,64 @@ export default function ReservationsPage() {
                     <h4 className="font-semibold text-amber-800">
                       Política de Cancelación
                     </h4>
-                    {(() => {
-                      const penalty =
-                        calculateCancellationPenalty(selectedReservation);
-                      return (
-                        <div className="mt-2 text-sm text-amber-700">
-                          <p>{penalty.message}</p>
-                          <div className="mt-2 space-y-1">
-                            <div className="flex justify-between">
-                              <span>Penalización:</span>
-                              <span className="font-medium">
-                                ${penalty.penalty.toFixed(2)}
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>Reembolso base:</span>
-                              <span className="font-medium">
-                                ${penalty.refund.toFixed(2)}
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>Tarifa limpieza (reembolsable):</span>
-                              <span className="font-medium">
-                                ${selectedReservation.cleaningFee.toFixed(2)}
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>Depósito (reembolsable):</span>
-                              <span className="font-medium">
-                                $
-                                {selectedReservation.property.securityDepositAmount.toFixed(
-                                  2,
-                                )}
-                              </span>
-                            </div>
+                      {isLoadingCancellationPreview ? (
+                          <p className="mt-2 text-sm text-amber-700">
+                              Cargando resumen de cancelación...
+                          </p>
+                      ) : cancellationPreview ? (
+                          <div className="mt-2 text-sm text-amber-700">
+                              <p>
+                                  {cancellationPreview.cancellationPenalty === 0
+                                      ? "Reembolso completo según la política de cancelación."
+                                      : "Esta cancelación aplica penalización."}
+                              </p>
+
+                              <div className="mt-2 space-y-1">
+                                  <div className="flex justify-between">
+                                      <span>Penalización:</span>
+                                      <span className="font-medium">
+          ${cancellationPreview.cancellationPenalty.toFixed(2)}
+        </span>
+                                  </div>
+
+                                  <div className="flex justify-between">
+                                      <span>Reembolso base:</span>
+                                      <span className="font-medium">
+          ${cancellationPreview.reservationRefundAmount.toFixed(2)}
+        </span>
+                                  </div>
+
+                                  <div className="flex justify-between">
+                                      <span>Tarifa limpieza:</span>
+                                      <span className="font-medium">
+          ${cancellationPreview.cleaningFeeRefundAmount.toFixed(2)}
+        </span>
+                                  </div>
+
+                                  <div className="flex justify-between">
+                                      <span>Depósito:</span>
+                                      <span className="font-medium">
+          ${cancellationPreview.guaranteeDepositRefundAmount.toFixed(2)}
+        </span>
+                                  </div>
+
+                                  <div className="mt-2 flex justify-between border-t border-amber-200 pt-2 font-bold">
+                                      <span>Total a reembolsar:</span>
+                                      <span>${cancellationPreview.totalRefundAmount.toFixed(2)}</span>
+                                  </div>
+                              </div>
                           </div>
-                        </div>
-                      );
-                    })()}
+                      ) : (
+                          <p className="mt-2 text-sm text-amber-700">
+                              No se pudo obtener el resumen de cancelación.
+                          </p>
+                      )}
                   </div>
                 </div>
               </div>
-
+                {cancellationError && (
+                    <p className="text-sm text-destructive">{cancellationError}</p>
+                )}
               <div className="rounded-lg bg-secondary p-4">
                 <h4 className="font-semibold">Propiedad</h4>
                 <p className="text-sm text-muted-foreground">
@@ -638,7 +687,17 @@ export default function ReservationsPage() {
             >
               Volver
             </Button>
-            <Button variant="destructive">Confirmar Cancelación</Button>
+            <Button
+                variant="destructive"
+                disabled={
+                    isLoadingCancellationPreview ||
+                    isCancellingReservation ||
+                    !cancellationPreview
+                }
+                onClick={handleConfirmCancellation}
+            >
+                {isCancellingReservation ? "Cancelando..." : "Confirmar Cancelación"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

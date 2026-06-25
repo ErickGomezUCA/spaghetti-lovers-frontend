@@ -196,3 +196,34 @@ export type AccessCodeDetailResponse = {
     accessCodeStatus: AccessCodeStatus;
     reservationStatus: string;
 };
+
+export type ReservationStatus =
+    | "RESERVED"
+    | "ACTIVE"
+    | "COMPLETED"
+    | "CANCELLED"
+
+export type ReservationCancellationPreviewResponse = {
+    reservationId: string
+    reservationStatus: ReservationStatus
+    checkInDate: string
+    checkOutDate: string
+    daysUntilCheckIn: number
+    cancellationPenalty: number
+    reservationRefundAmount: number
+    cleaningFeeRefundAmount: number
+    guaranteeDepositRefundAmount: number
+    totalRefundAmount: number
+}
+
+export type ReservationCancellationResponse = {
+    reservationId: string
+    reservationStatus: ReservationStatus
+    cancellationPenalty: number
+    reservationRefundAmount: number
+    cleaningFeeRefundAmount: number
+    guaranteeDepositRefundAmount: number
+    totalRefundAmount: number
+    cancelledAt: string
+}
+
