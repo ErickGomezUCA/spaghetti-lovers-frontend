@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useEffect } from "react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,7 +10,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
@@ -29,333 +28,295 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import {
-  Home,
   MapPin,
   CalendarDays,
   Clock,
   Users,
-  CreditCard,
   Key,
   FileText,
   ChevronRight,
   CalendarIcon,
   AlertTriangle,
   Star,
+  Home,
+  Image as ImageIcon,
+  Loader2,
+  CreditCard,
+  CheckCircle2,
 } from "lucide-react";
-import { mockReservations, type Reservation } from "@/lib/mock-data";
 import { cn } from "@/utils/cn";
-import { format, addDays } from "date-fns";
+import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
-const statusColors = {
-  reserved: "bg-blue-100 text-blue-800",
-  active: "bg-green-100 text-green-800",
-  completed: "bg-gray-100 text-gray-800",
-  cancelled: "bg-red-100 text-red-800",
+import { reservationService } from "@/lib/services/reservation.service";
+import { ReservationResponse, ReservationDetailResponse } from "@/types/api-responses";
+
+const statusColors: Record<string, string> = {
+  RESERVED: "bg-blue-100 text-blue-800",
+  ACTIVE: "bg-green-100 text-green-800",
+  COMPLETED: "bg-gray-100 text-gray-800",
+  CANCELLED: "bg-red-100 text-red-800",
 };
 
-const statusLabels = {
-  reserved: "Reservada",
-  active: "En Curso",
-  completed: "Completada",
-  cancelled: "Cancelada",
+const statusLabels: Record<string, string> = {
+  RESERVED: "Reservada",
+  ACTIVE: "En Curso",
+  COMPLETED: "Completada",
+  CANCELLED: "Cancelada",
+};
+
+const errorTranslations: Record<string, string> = {
+  "The property is not available for the requested extension dates.": "La propiedad no está disponible para las fechas solicitadas. Probablemente ya fue reservada por otra persona.",
+  "The new check-out date must be after the current check-out date.": "La nueva fecha de salida debe ser posterior a la actual.",
+  "Only RESERVED or ACTIVE reservations can be extended.": "Solo puedes extender reservas activas o en estado reservado.",
+  "A valid payment method is required. 'PENDING' is not allowed for extensions.": "Debes seleccionar un método de pago válido."
+};
+
+const translateApiError = (englishErrorMsg: string) => {
+  if (!englishErrorMsg) return "Ha ocurrido un error inesperado al extender la reserva. Por favor, intenta de nuevo.";
+  return errorTranslations[englishErrorMsg] || englishErrorMsg; 
+};
+
+const formatShortDateCard = (dateString: string) => {
+  if (!dateString) return "";
+  const [year, month, day] = dateString.split("-");
+  const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+  const monthStr = date.toLocaleDateString("es-ES", { month: "short" }).replace(".", "");
+  return `${day} ${monthStr} ${year}`;
+};
+
+const formatFullLongDate = (dateString: string) => {
+  if (!dateString) return "";
+  const [year, month, day] = dateString.split("-");
+  const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+  return date.toLocaleDateString("es-ES", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 };
 
 export default function ReservationsPage() {
-  const [selectedReservation, setSelectedReservation] =
-    useState<Reservation | null>(null);
+  const [reservations, setReservations] = useState<ReservationResponse[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const [selectedReservation, setSelectedReservation] = useState<ReservationResponse | null>(null);
+  
+  const [selectedDetail, setSelectedDetail] = useState<ReservationDetailResponse | null>(null);
+  const [isDetailLoading, setIsDetailLoading] = useState(false);
+  const [showDetailDialog, setShowDetailDialog] = useState(false);
+
   const [showExtendDialog, setShowExtendDialog] = useState(false);
-  const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [newCheckoutDate, setNewCheckoutDate] = useState<Date | undefined>();
+  const [extendPaymentMethod, setExtendPaymentMethod] = useState("CARD");
+  const [extendError, setExtendError] = useState<string | null>(null);
+  const [isExtending, setIsExtending] = useState(false);
+  const [showExtendSuccess, setShowExtendSuccess] = useState(false);
 
-  const activeReservations = mockReservations.filter(
-    (r) =>
-      r.reservationStatus === "active" || r.reservationStatus === "reserved",
-  );
-  const completedReservations = mockReservations.filter(
-    (r) => r.reservationStatus === "completed",
-  );
-  const cancelledReservations = mockReservations.filter(
-    (r) => r.reservationStatus === "cancelled",
-  );
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
 
-  const calculateExtensionCost = (reservation: Reservation, newDate: Date) => {
-    const currentCheckout = new Date(reservation.checkOutDate);
-    const additionalNights = Math.ceil(
-      (newDate.getTime() - currentCheckout.getTime()) / (1000 * 60 * 60 * 24),
-    );
-    return additionalNights * reservation.property.basePricePerNight;
-  };
-
-  const calculateCancellationPenalty = (reservation: Reservation) => {
-    const checkIn = new Date(reservation.checkInDate);
-    const today = new Date();
-    const daysUntilCheckin = Math.ceil(
-      (checkIn.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
-    );
-
-    if (daysUntilCheckin >= 7) {
-      return {
-        penalty: 0,
-        refund: reservation.baseTotal,
-        message: "Reembolso completo del 100%",
-      };
-    } else if (daysUntilCheckin >= 3) {
-      return {
-        penalty: reservation.baseTotal * 0.5,
-        refund: reservation.baseTotal * 0.5,
-        message: "Penalización del 50%",
-      };
-    } else {
-      return {
-        penalty: reservation.baseTotal,
-        refund: 0,
-        message: "Sin reembolso (menos de 3 días)",
-      };
+  const fetchReservations = async () => {
+    setIsLoading(true);
+    try {
+      const res = await reservationService.getMyReservations(0, 50);
+      setReservations(res.data || []);
+    } catch (error) {
+      console.error("Error cargando reservas:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const ReservationCard = ({ reservation }: { reservation: Reservation }) => (
-    <Card className="overflow-hidden">
-      <div className="flex flex-col md:flex-row">
-        <div className="aspect-video w-full bg-muted md:aspect-square md:w-48">
-          <img
-            src={reservation.property.photos[0]}
-            alt={reservation.property.title}
-            className="h-full w-full object-cover"
-          />
-        </div>
-        <div className="flex flex-1 flex-col p-4">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <h3 className="font-semibold">{reservation.property.title}</h3>
-              <p className="flex items-center gap-1 text-sm text-muted-foreground">
-                <MapPin className="h-4 w-4" />
-                {reservation.property.city}, {reservation.property.department}
-              </p>
-            </div>
-            <Badge className={statusColors[reservation.reservationStatus]}>
-              {statusLabels[reservation.reservationStatus]}
-            </Badge>
-          </div>
+  useEffect(() => {
+    fetchReservations();
+  }, []);
 
-          <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
-            <div className="flex items-center gap-2">
-              <CalendarDays className="h-4 w-4 text-muted-foreground" />
-              <div>
-                <p className="text-xs text-muted-foreground">Check-in</p>
-                <p className="font-medium">
-                  {new Date(reservation.checkInDate).toLocaleDateString(
-                    "es-ES",
-                    {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                    },
-                  )}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              <div>
-                <p className="text-xs text-muted-foreground">Check-out</p>
-                <p className="font-medium">
-                  {new Date(reservation.checkOutDate).toLocaleDateString(
-                    "es-ES",
-                    {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                    },
-                  )}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-muted-foreground" />
-              <div>
-                <p className="text-xs text-muted-foreground">Huéspedes</p>
-                <p className="font-medium">{reservation.guestsCount}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <CreditCard className="h-4 w-4 text-muted-foreground" />
-              <div>
-                <p className="text-xs text-muted-foreground">Total</p>
-                <p className="font-medium text-primary">
-                  ${reservation.totalPrice.toFixed(2)}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setSelectedReservation(reservation)}
-                >
-                  Ver Detalles <ChevronRight className="ml-1 h-4 w-4" />
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-lg">
-                <DialogHeader>
-                  <DialogTitle>Detalle de Reserva</DialogTitle>
-                  <DialogDescription>
-                    {reservation.property.title}
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="rounded-lg bg-secondary p-4">
-                    <h4 className="font-semibold">
-                      Información de la Propiedad
-                    </h4>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {reservation.property.address}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {reservation.property.city},{" "}
-                      {reservation.property.department}
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-xs text-muted-foreground">Check-in</p>
-                      <p className="font-medium">
-                        {new Date(reservation.checkInDate).toLocaleDateString(
-                          "es-ES",
-                          {
-                            weekday: "long",
-                            day: "numeric",
-                            month: "long",
-                            year: "numeric",
-                          },
-                        )}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Check-out</p>
-                      <p className="font-medium">
-                        {new Date(reservation.checkOutDate).toLocaleDateString(
-                          "es-ES",
-                          {
-                            weekday: "long",
-                            day: "numeric",
-                            month: "long",
-                            year: "numeric",
-                          },
-                        )}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="rounded-lg border border-border p-4">
-                    <h4 className="font-semibold">Desglose de Precios</h4>
-                    <div className="mt-2 space-y-1 text-sm">
-                      <div className="flex justify-between">
-                        <span>
-                          ${reservation.property.basePricePerNight} x{" "}
-                          {reservation.totalNights} noches
-                        </span>
-                        <span>${reservation.baseTotal.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Tarifa de limpieza</span>
-                        <span>${reservation.cleaningFee.toFixed(2)}</span>
-                      </div>
-                      {reservation.longStayDiscount > 0 && (
-                        <div className="flex justify-between text-green-600">
-                          <span>Descuento estadía larga</span>
-                          <span>
-                            -${reservation.longStayDiscount.toFixed(2)}
-                          </span>
-                        </div>
-                      )}
-                      <div className="flex justify-between">
-                        <span>Depósito de garantía</span>
-                        <span>
-                          $
-                          {reservation.property.securityDepositAmount.toFixed(
-                            2,
-                          )}
-                        </span>
-                      </div>
-                      <div className="mt-2 flex justify-between border-t border-border pt-2 font-bold">
-                        <span>Total</span>
-                        <span className="text-primary">
-                          ${reservation.totalPrice.toFixed(2)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {reservation.accessCode &&
-                    (reservation.reservationStatus === "active" ||
-                      reservation.reservationStatus === "reserved") && (
-                      <div className="flex items-center justify-between rounded-lg bg-primary/10 p-4">
-                        <div className="flex items-center gap-3">
-                          <Key className="h-6 w-6 text-primary" />
-                          <div>
-                            <p className="text-xs text-muted-foreground">
-                              Código de Acceso
-                            </p>
-                            <p className="font-mono text-lg font-bold">
-                              {reservation.accessCode}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                </div>
-              </DialogContent>
-            </Dialog>
-
-            {(reservation.reservationStatus === "active" ||
-              reservation.reservationStatus === "reserved") && (
-              <>
-                {reservation.accessCode && (
-                  <Button variant="outline" size="sm">
-                    <Key className="mr-1 h-4 w-4" /> {reservation.accessCode}
-                  </Button>
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setSelectedReservation(reservation);
-                    setShowExtendDialog(true);
-                  }}
-                >
-                  Extender
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                  onClick={() => {
-                    setSelectedReservation(reservation);
-                    setShowCancelDialog(true);
-                  }}
-                >
-                  Cancelar
-                </Button>
-              </>
-            )}
-
-            {reservation.reservationStatus === "completed" && (
-              <Button variant="outline" size="sm">
-                <Star className="mr-1 h-4 w-4" /> Calificar
-              </Button>
-            )}
-          </div>
-        </div>
-      </div>
-    </Card>
+  const activeReservations = reservations.filter(
+    (r) => r.reservationStatus === "ACTIVE" || r.reservationStatus === "RESERVED"
   );
+  const completedReservations = reservations.filter(
+    (r) => r.reservationStatus === "COMPLETED"
+  );
+  const cancelledReservations = reservations.filter(
+    (r) => r.reservationStatus === "CANCELLED"
+  );
+
+  const handleViewDetails = async (reservation: ReservationResponse) => {
+    setSelectedReservation(reservation);
+    setShowDetailDialog(true);
+    setIsDetailLoading(true);
+    
+    try {
+      const res = await reservationService.getLandlordReservationDetail(reservation.id);
+      setSelectedDetail(res.data);
+    } catch (error) {
+      console.error("Error cargando el detalle completo:", error);
+    } finally {
+      setIsDetailLoading(false);
+    }
+  };
+
+  const handleOpenExtend = async (reservation: ReservationResponse) => {
+    setSelectedReservation(reservation);
+    setNewCheckoutDate(undefined);
+    setExtendError(null);
+    setExtendPaymentMethod("CARD");
+    setShowExtendDialog(true);
+    setIsDetailLoading(true);
+
+    try {
+      const res = await reservationService.getLandlordReservationDetail(reservation.id);
+      setSelectedDetail(res.data);
+    } catch (error) {
+      console.error("Error cargando detalle para extensión:", error);
+    } finally {
+      setIsDetailLoading(false);
+    }
+  };
+
+  const handleConfirmExtension = async () => {
+    if (!selectedReservation || !newCheckoutDate) return;
+
+    setExtendError(null);
+    setIsExtending(true);
+
+    try {
+      const formattedNewDate = format(newCheckoutDate, 'yyyy-MM-dd');
+      
+      await reservationService.extendReservation(selectedReservation.id, {
+        newCheckOutDate: formattedNewDate,
+        paymentMethod: extendPaymentMethod
+      });
+
+      setShowExtendDialog(false);
+      setShowExtendSuccess(true);
+      fetchReservations();
+    } catch (error: any) {
+      console.error("Error al extender:", error);
+      const translatedMsg = translateApiError(error.message);
+      setExtendError(translatedMsg);
+    } finally {
+      setIsExtending(false);
+    }
+  };
+
+  const ReservationCard = ({ reservation }: { reservation: ReservationResponse }) => {
+    const [imageError, setImageError] = useState(false);
+
+    return (
+      <Card className="overflow-hidden">
+        <div className="flex flex-col md:flex-row">
+          <div className="aspect-video w-full bg-muted/50 flex items-center justify-center border-r md:aspect-square md:w-56 shrink-0 overflow-hidden">
+            {(reservation as any).propertyImage && !imageError ? (
+              <img 
+                src={(reservation as any).propertyImage} 
+                alt={reservation.propertyName}
+                className="h-full w-full object-cover"
+                onError={() => setImageError(true)}
+              />
+            ) : (
+              <ImageIcon className="h-8 w-8 text-muted-foreground/30" />
+            )}
+          </div>
+
+          <div className="flex flex-1 flex-col p-5">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <h3 className="font-semibold text-lg">{reservation.propertyName}</h3>
+                <p className="flex items-center gap-1.5 text-sm text-muted-foreground mt-0.5">
+                  <MapPin className="h-4 w-4" />
+                  {(reservation as any).propertyCity && (reservation as any).propertyDepartment
+                    ? `${(reservation as any).propertyCity}, ${(reservation as any).propertyDepartment}`
+                    : "Ubicación no disponible"}
+                </p>
+              </div>
+              <Badge className={cn("font-medium", statusColors[reservation.reservationStatus] || "bg-gray-100")}>
+                {statusLabels[reservation.reservationStatus] || reservation.reservationStatus}
+              </Badge>
+            </div>
+
+            <div className="mt-5 grid grid-cols-2 gap-y-4 text-sm">
+              <div className="flex items-start gap-2">
+                <CalendarDays className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Check-in</p>
+                  <p className="font-medium">{formatShortDateCard(reservation.checkInDate)}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <Clock className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Check-out</p>
+                  <p className="font-medium">{formatShortDateCard(reservation.checkOutDate)}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <Users className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Huéspedes</p>
+                  <p className="font-medium">{reservation.guestsCount}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <CreditCard className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Total</p>
+                  <p className="font-medium text-primary">
+                    ${reservation.totalPrice?.toFixed(2)}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleViewDetails(reservation)}
+              >
+                Ver Detalles <ChevronRight className="ml-1 h-4 w-4" />
+              </Button>
+
+              {(reservation.reservationStatus === "ACTIVE" || reservation.reservationStatus === "RESERVED") && (
+                <>
+                  <Button variant="outline" size="sm" className="bg-muted/30">
+                    <Key className="mr-1 h-4 w-4 text-muted-foreground" /> 
+                    <span className="text-muted-foreground">Pendiente</span>
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleOpenExtend(reservation)}
+                  >
+                    Extender
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive hover:bg-destructive hover:text-destructive-foreground border-destructive/30"
+                    onClick={() => {
+                      setSelectedReservation(reservation);
+                      setShowCancelDialog(true);
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                </>
+              )}
+
+              {reservation.reservationStatus === "COMPLETED" && (
+                <Button variant="outline" size="sm">
+                  <Star className="mr-1 h-4 w-4" /> Calificar
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -380,13 +341,13 @@ export default function ReservationsPage() {
         </TabsList>
 
         <TabsContent value="active" className="mt-4 space-y-4">
-          {activeReservations.length === 0 ? (
+          {isLoading ? (
+            <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+          ) : activeReservations.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <Home className="mb-4 h-12 w-12 text-muted-foreground/50" />
-                <h3 className="text-lg font-semibold">
-                  No tienes reservas activas
-                </h3>
+                <h3 className="text-lg font-semibold">No tienes reservas activas</h3>
                 <p className="text-muted-foreground">
                   Busca propiedades para hacer tu próxima reserva
                 </p>
@@ -400,7 +361,9 @@ export default function ReservationsPage() {
         </TabsContent>
 
         <TabsContent value="completed" className="mt-4 space-y-4">
-          {completedReservations.length === 0 ? (
+          {isLoading ? (
+             <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+          ) : completedReservations.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <FileText className="mb-4 h-12 w-12 text-muted-foreground/50" />
@@ -420,7 +383,9 @@ export default function ReservationsPage() {
         </TabsContent>
 
         <TabsContent value="cancelled" className="mt-4 space-y-4">
-          {cancelledReservations.length === 0 ? (
+          {isLoading ? (
+             <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+          ) : cancelledReservations.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <AlertTriangle className="mb-4 h-12 w-12 text-muted-foreground/50" />
@@ -440,35 +405,129 @@ export default function ReservationsPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Extend Dialog */}
-      <Dialog open={showExtendDialog} onOpenChange={setShowExtendDialog}>
-        <DialogContent>
+      <Dialog 
+        open={showDetailDialog} 
+        onOpenChange={(open) => {
+          setShowDetailDialog(open);
+          if (!open) setSelectedDetail(null);
+        }}
+      >
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Extender Reserva</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-xl">Detalle de Reserva</DialogTitle>
+            <DialogDescription className="text-base text-muted-foreground">
+              {selectedReservation?.propertyName}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {isDetailLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : selectedDetail && (
+            <div className="space-y-5">
+              <div className="rounded-xl bg-secondary/50 p-4">
+                <h4 className="font-semibold text-foreground">
+                  Información de la Propiedad
+                </h4>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {selectedDetail.property?.address || "Dirección específica disponible al hacer check-in"}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {selectedDetail.property?.city}, {selectedDetail.property?.department}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 px-1">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Check-in</p>
+                  <p className="font-medium text-[15px]">
+                    {formatFullLongDate(selectedDetail.checkInDate)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Check-out</p>
+                  <p className="font-medium text-[15px]">
+                    {formatFullLongDate(selectedDetail.checkOutDate)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-border p-4">
+                <h4 className="font-semibold mb-3">Desglose de Precios</h4>
+                <div className="space-y-2 text-sm text-muted-foreground">
+                  <div className="flex justify-between">
+                    <span>Estadía ({selectedDetail.totalNights} noches)</span>
+                    <span>${selectedDetail.baseTotal?.toFixed(2) || "0.00"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Tarifa de limpieza</span>
+                    <span>${selectedDetail.cleaningFee?.toFixed(2) || "0.00"}</span>
+                  </div>
+                  {selectedDetail.longStayDiscount > 0 && (
+                    <div className="flex justify-between text-green-600">
+                      <span>Descuento estadía larga</span>
+                      <span>-${selectedDetail.longStayDiscount.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span>Depósito de garantía</span>
+                    <span>$150.00</span>
+                  </div>
+                  <div className="mt-2 flex justify-between border-t border-border pt-3 font-bold text-base text-foreground">
+                    <span>Total</span>
+                    <span className="text-primary">
+                      ${selectedDetail.totalPrice?.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 rounded-xl bg-[#FFF6F0] p-4 border border-orange-100">
+                <Key className="h-6 w-6 text-[#E46B4B]" />
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">
+                    Código de Acceso
+                  </p>
+                  <p className="font-mono text-sm font-bold text-[#E46B4B]">
+                    Pendiente de conexión
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showExtendDialog} onOpenChange={setShowExtendDialog}>
+        <DialogContent className="max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="text-xl">Extender Reserva</DialogTitle>
+            <DialogDescription className="text-base text-muted-foreground">
               Selecciona la nueva fecha de check-out
             </DialogDescription>
           </DialogHeader>
+          
+          {extendError && (
+            <div className="rounded-lg bg-red-50 border border-red-200 p-3 flex items-start gap-3 mb-2">
+              <AlertTriangle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+              <p className="text-sm text-red-800 font-medium">{extendError}</p>
+            </div>
+          )}
+
           {selectedReservation && (
-            <div className="space-y-4">
+            <div className="space-y-5 py-4">
               <div>
-                <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Fecha actual de check-out
                 </Label>
-                <p className="mt-1 font-medium">
-                  {new Date(
-                    selectedReservation.checkOutDate,
-                  ).toLocaleDateString("es-ES", {
-                    weekday: "long",
-                    day: "numeric",
-                    month: "long",
-                    year: "numeric",
-                  })}
+                <p className="mt-1 text-[17px] font-medium text-foreground">
+                  {formatFullLongDate(selectedReservation.checkOutDate)}
                 </p>
               </div>
 
               <div>
-                <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5 block">
                   Nueva fecha de check-out
                 </Label>
                 <Popover>
@@ -476,13 +535,13 @@ export default function ReservationsPage() {
                     <Button
                       variant="outline"
                       className={cn(
-                        "mt-1 w-full justify-start text-left font-normal",
-                        !newCheckoutDate && "text-muted-foreground",
+                        "w-full justify-start text-left font-normal h-11",
+                        !newCheckoutDate && "text-muted-foreground"
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {newCheckoutDate
-                        ? format(newCheckoutDate, "PPP", { locale: es })
+                        ? format(newCheckoutDate, "d 'de' MMMM yyyy", { locale: es })
                         : "Selecciona fecha"}
                     </Button>
                   </PopoverTrigger>
@@ -490,147 +549,133 @@ export default function ReservationsPage() {
                     <Calendar
                       mode="single"
                       selected={newCheckoutDate}
-                      onSelect={setNewCheckoutDate}
-                      disabled={(date) =>
-                        date <= new Date(selectedReservation.checkOutDate)
-                      }
+                      onSelect={(date) => {
+                         setNewCheckoutDate(date);
+                         setExtendError(null);
+                      }}
+                      defaultMonth={new Date(selectedReservation.checkOutDate)}
+                      disabled={(date) => {
+                        const checkOut = new Date(selectedReservation.checkOutDate);
+                        checkOut.setHours(0, 0, 0, 0);
+                        date.setHours(0, 0, 0, 0);
+                        return date.getTime() <= checkOut.getTime();
+                      }}
                     />
                   </PopoverContent>
                 </Popover>
               </div>
 
               <div>
-                <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5 block">
                   Método de Pago
                 </Label>
-                <Select defaultValue="card">
-                  <SelectTrigger className="mt-1">
+                <Select value={extendPaymentMethod} onValueChange={(v) => {setExtendPaymentMethod(v); setExtendError(null);}}>
+                  <SelectTrigger className="w-full h-11">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="card">
-                      Tarjeta de Crédito/Débito
-                    </SelectItem>
-                    <SelectItem value="transfer">
-                      Transferencia Bancaria
-                    </SelectItem>
-                    <SelectItem value="cash">Efectivo</SelectItem>
+                    <SelectItem value="CARD">Tarjeta de Crédito/Débito</SelectItem>
+                    <SelectItem value="TRANSFER">Transferencia Bancaria</SelectItem>
+                    <SelectItem value="CASH">Efectivo</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              {newCheckoutDate && (
-                <div className="rounded-lg bg-secondary p-4">
-                  <h4 className="font-semibold">Costo de Extensión</h4>
-                  <p className="mt-2 text-2xl font-bold text-primary">
-                    $
-                    {calculateExtensionCost(
-                      selectedReservation,
-                      newCheckoutDate,
-                    ).toFixed(2)}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {Math.ceil(
-                      (newCheckoutDate.getTime() -
-                        new Date(selectedReservation.checkOutDate).getTime()) /
-                        (1000 * 60 * 60 * 24),
-                    )}{" "}
-                    noches adicionales × $
-                    {selectedReservation.property.basePricePerNight}/noche
-                  </p>
+              {newCheckoutDate && selectedDetail?.property && (
+                <div className="rounded-xl bg-secondary/50 p-4">
+                  <h4 className="font-semibold text-sm mb-3">Costo de Extensión</h4>
+                  {(() => {
+                    const currentCheckout = new Date(selectedReservation.checkOutDate);
+                    currentCheckout.setHours(0,0,0,0);
+                    const newCheckout = new Date(newCheckoutDate);
+                    newCheckout.setHours(0,0,0,0);
+                    
+                    const additionalNights = Math.round((newCheckout.getTime() - currentCheckout.getTime()) / (1000 * 60 * 60 * 24));
+                    const basePrice = selectedDetail.property.basePricePerNight || 0;
+                    const totalExtension = additionalNights * basePrice;
+
+                    return (
+                      <div className="space-y-2 text-sm text-muted-foreground">
+                        <div className="flex justify-between">
+                          <span>${basePrice.toFixed(2)} x {additionalNights} {additionalNights === 1 ? 'noche adicional' : 'noches adicionales'}</span>
+                          <span>${totalExtension.toFixed(2)}</span>
+                        </div>
+                        <div className="mt-2 flex justify-between border-t border-border pt-3 font-bold text-foreground">
+                          <span>Total a pagar hoy</span>
+                          <span className="text-primary">${totalExtension.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
             </div>
           )}
-          <DialogFooter>
+          
+          <DialogFooter className="gap-2 sm:gap-0 mt-2">
             <Button
               variant="outline"
               onClick={() => setShowExtendDialog(false)}
+              className="h-11"
+              disabled={isExtending}
             >
               Cancelar
             </Button>
-            <Button disabled={!newCheckoutDate}>Confirmar Extensión</Button>
+            <Button 
+              disabled={!newCheckoutDate || isExtending} 
+              className="h-11"
+              onClick={handleConfirmExtension}
+            >
+              {isExtending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Procesando...
+                </>
+              ) : (
+                "Confirmar Extensión"
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Cancel Dialog */}
+      <Dialog open={showExtendSuccess} onOpenChange={setShowExtendSuccess}>
+         <DialogContent className="max-w-sm sm:max-w-[425px]">
+           <div className="flex flex-col items-center justify-center p-6 text-center space-y-4">
+             <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
+               <CheckCircle2 className="h-6 w-6 text-green-600" />
+             </div>
+             <DialogTitle className="text-xl">¡Reserva Extendida!</DialogTitle>
+             <DialogDescription className="text-base text-center">
+               Tu reserva para <strong>{selectedReservation?.propertyName}</strong> ha sido extendida con éxito. Las nuevas fechas y totales ya están reflejados en tu panel.
+             </DialogDescription>
+             <Button 
+               className="w-full mt-4 h-11" 
+               onClick={() => {
+                 setShowExtendSuccess(false);
+               }}
+             >
+               Entendido
+             </Button>
+           </div>
+         </DialogContent>
+      </Dialog>
+
       <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-[400px]">
           <DialogHeader>
             <DialogTitle>Cancelar Reserva</DialogTitle>
             <DialogDescription>
               ¿Estás seguro de que deseas cancelar esta reserva?
             </DialogDescription>
           </DialogHeader>
-          {selectedReservation && (
-            <div className="space-y-4">
-              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="h-5 w-5 text-amber-600" />
-                  <div>
-                    <h4 className="font-semibold text-amber-800">
-                      Política de Cancelación
-                    </h4>
-                    {(() => {
-                      const penalty =
-                        calculateCancellationPenalty(selectedReservation);
-                      return (
-                        <div className="mt-2 text-sm text-amber-700">
-                          <p>{penalty.message}</p>
-                          <div className="mt-2 space-y-1">
-                            <div className="flex justify-between">
-                              <span>Penalización:</span>
-                              <span className="font-medium">
-                                ${penalty.penalty.toFixed(2)}
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>Reembolso base:</span>
-                              <span className="font-medium">
-                                ${penalty.refund.toFixed(2)}
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>Tarifa limpieza (reembolsable):</span>
-                              <span className="font-medium">
-                                ${selectedReservation.cleaningFee.toFixed(2)}
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>Depósito (reembolsable):</span>
-                              <span className="font-medium">
-                                $
-                                {selectedReservation.property.securityDepositAmount.toFixed(
-                                  2,
-                                )}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })()}
-                  </div>
-                </div>
-              </div>
+          
+          <div className="py-8 my-2 text-center border rounded-xl bg-muted/20">
+             <AlertTriangle className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
+             <p className="text-sm font-medium text-muted-foreground">Módulo de cancelaciones</p>
+             <p className="text-xs text-muted-foreground mt-1">Pendiente de conexión</p>
+          </div>
 
-              <div className="rounded-lg bg-secondary p-4">
-                <h4 className="font-semibold">Propiedad</h4>
-                <p className="text-sm text-muted-foreground">
-                  {selectedReservation.property.title}
-                </p>
-                <p className="mt-2 text-sm">
-                  {new Date(selectedReservation.checkInDate).toLocaleDateString(
-                    "es-ES",
-                  )}{" "}
-                  -{" "}
-                  {new Date(
-                    selectedReservation.checkOutDate,
-                  ).toLocaleDateString("es-ES")}
-                </p>
-              </div>
-            </div>
-          )}
           <DialogFooter>
             <Button
               variant="outline"
@@ -638,7 +683,7 @@ export default function ReservationsPage() {
             >
               Volver
             </Button>
-            <Button variant="destructive">Confirmar Cancelación</Button>
+            <Button variant="destructive" disabled>Confirmar Cancelación</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
