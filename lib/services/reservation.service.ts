@@ -4,14 +4,23 @@ import { ReservationResponse, LandlordReservationSummaryResponse, ReservationDet
 
 export const reservationService = {
   
-  getMyReservations: (page: number = 0, pageSize: number = 10, status?: string) => {
+  getMyReservations: async (
+    page: number = 0, 
+    pageSize: number = 10, 
+    sortBy?: string, 
+    sortOrder?: string, 
+    status?: string
+  ) => {
     const params = new URLSearchParams({
       page: page.toString(),
       pageSize: pageSize.toString(),
     });
+
+    if (sortBy) params.append("sortBy", sortBy);
+    if (sortOrder) params.append("sortOrder", sortOrder);
     if (status) params.append("status", status);
 
-    return apiClient.get<ApiResponse<ReservationResponse[]>>(`/reservations/my-reservations?${params.toString()}`);
+    return await apiClient.get<ApiResponse<ReservationResponse[]>>(`/reservations/my-reservations?${params.toString()}`);
   },
 
   getLandlordReservations: (page: number = 0, pageSize: number = 10, status?: string, search?: string) => {

@@ -175,6 +175,8 @@ export type ReservationResponse = {
   guestsCount: number;
   totalPrice: number;
   reservationStatus: ReservationStatus;
+  propertyCity: string;
+  propertyDepartment: string;
 };
 
 export type LandlordReservationSummaryResponse = {
