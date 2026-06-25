@@ -39,8 +39,11 @@ export const reservationService = {
   },
 
   getLandlordReservationDetail: async (id: string) => {
-    // Le quitamos la palabra "landlord" de la URL para usar tu endpoint universal
     return await apiClient.get<{ data: ReservationDetailResponse }>(`/reservations/${id}`);
+  },
+
+  createReservation: async (data: { propertyId: string, checkInDate: string, checkOutDate: string, guestsCount: number, paymentMethod: string }) => {
+    return await apiClient.post<{ data: ReservationResponse }>('/reservations', data);
   },
 };
 
