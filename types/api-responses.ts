@@ -205,5 +205,21 @@ export type ReservationDetailResponse = {
     address: string;
     city: string;
     department: string;
+    basePricePerNight: number;
   };
+};
+
+export type PaymentResponse = {
+  id: string;
+  amount: number;
+  paymentType: string;
+  paymentMethod: string;
+  refundAmount: number;
+  createdAt: string;
+  refundedAt?: string;
+};
+
+export type ReservationExtensionResponse = {
+  reservation: ReservationResponse;
+  extensionPayment: PaymentResponse;
 };

@@ -10,7 +10,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
@@ -43,6 +42,7 @@ import {
   Image as ImageIcon,
   Loader2,
   CreditCard,
+  CheckCircle2,
 } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { format } from "date-fns";
@@ -63,6 +63,18 @@ const statusLabels: Record<string, string> = {
   ACTIVE: "En Curso",
   COMPLETED: "Completada",
   CANCELLED: "Cancelada",
+};
+
+const errorTranslations: Record<string, string> = {
+  "The property is not available for the requested extension dates.": "La propiedad no está disponible para las fechas solicitadas. Probablemente ya fue reservada por otra persona.",
+  "The new check-out date must be after the current check-out date.": "La nueva fecha de salida debe ser posterior a la actual.",
+  "Only RESERVED or ACTIVE reservations can be extended.": "Solo puedes extender reservas activas o en estado reservado.",
+  "A valid payment method is required. 'PENDING' is not allowed for extensions.": "Debes seleccionar un método de pago válido."
+};
+
+const translateApiError = (englishErrorMsg: string) => {
+  if (!englishErrorMsg) return "Ha ocurrido un error inesperado al extender la reserva. Por favor, intenta de nuevo.";
+  return errorTranslations[englishErrorMsg] || englishErrorMsg; 
 };
 
 const formatShortDateCard = (dateString: string) => {
@@ -96,22 +108,27 @@ export default function ReservationsPage() {
   const [showDetailDialog, setShowDetailDialog] = useState(false);
 
   const [showExtendDialog, setShowExtendDialog] = useState(false);
-  const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [newCheckoutDate, setNewCheckoutDate] = useState<Date | undefined>();
+  const [extendPaymentMethod, setExtendPaymentMethod] = useState("CARD");
+  const [extendError, setExtendError] = useState<string | null>(null);
+  const [isExtending, setIsExtending] = useState(false);
+  const [showExtendSuccess, setShowExtendSuccess] = useState(false);
+
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+
+  const fetchReservations = async () => {
+    setIsLoading(true);
+    try {
+      const res = await reservationService.getMyReservations(0, 50);
+      setReservations(res.data || []);
+    } catch (error) {
+      console.error("Error cargando reservas:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchReservations = async () => {
-      setIsLoading(true);
-      try {
-        const res = await reservationService.getMyReservations(0, 50);
-        setReservations(res.data || []);
-      } catch (error) {
-        console.error("Error cargando reservas:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchReservations();
   }, []);
 
@@ -140,120 +157,166 @@ export default function ReservationsPage() {
     }
   };
 
-  const ReservationCard = ({ reservation }: { reservation: ReservationResponse }) => (
-    <Card className="overflow-hidden">
-      <div className="flex flex-col md:flex-row">
-        <div className="aspect-video w-full bg-muted/50 flex items-center justify-center border-r md:aspect-square md:w-56 shrink-0 overflow-hidden">
-          {(reservation as any).propertyImage ? (
-            <img 
-              src={(reservation as any).propertyImage} 
-              alt={reservation.propertyName}
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <ImageIcon className="h-8 w-8 text-muted-foreground/30" />
-          )}
-        </div>
+  const handleOpenExtend = async (reservation: ReservationResponse) => {
+    setSelectedReservation(reservation);
+    setNewCheckoutDate(undefined);
+    setExtendError(null);
+    setExtendPaymentMethod("CARD");
+    setShowExtendDialog(true);
+    setIsDetailLoading(true);
 
-        <div className="flex flex-1 flex-col p-5">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <h3 className="font-semibold text-lg">{reservation.propertyName}</h3>
-              <p className="flex items-center gap-1.5 text-sm text-muted-foreground mt-0.5">
-                <MapPin className="h-4 w-4" />
-                {(reservation as any).propertyCity && (reservation as any).propertyDepartment
-                  ? `${(reservation as any).propertyCity}, ${(reservation as any).propertyDepartment}`
-                  : "Ubicación no disponible"}
-              </p>
-            </div>
-            <Badge className={cn("font-medium", statusColors[reservation.reservationStatus] || "bg-gray-100")}>
-              {statusLabels[reservation.reservationStatus] || reservation.reservationStatus}
-            </Badge>
+    try {
+      const res = await reservationService.getLandlordReservationDetail(reservation.id);
+      setSelectedDetail(res.data);
+    } catch (error) {
+      console.error("Error cargando detalle para extensión:", error);
+    } finally {
+      setIsDetailLoading(false);
+    }
+  };
+
+  const handleConfirmExtension = async () => {
+    if (!selectedReservation || !newCheckoutDate) return;
+
+    setExtendError(null);
+    setIsExtending(true);
+
+    try {
+      const formattedNewDate = format(newCheckoutDate, 'yyyy-MM-dd');
+      
+      await reservationService.extendReservation(selectedReservation.id, {
+        newCheckOutDate: formattedNewDate,
+        paymentMethod: extendPaymentMethod
+      });
+
+      setShowExtendDialog(false);
+      setShowExtendSuccess(true);
+      fetchReservations();
+    } catch (error: any) {
+      console.error("Error al extender:", error);
+      const translatedMsg = translateApiError(error.message);
+      setExtendError(translatedMsg);
+    } finally {
+      setIsExtending(false);
+    }
+  };
+
+  const ReservationCard = ({ reservation }: { reservation: ReservationResponse }) => {
+    const [imageError, setImageError] = useState(false);
+
+    return (
+      <Card className="overflow-hidden">
+        <div className="flex flex-col md:flex-row">
+          <div className="aspect-video w-full bg-muted/50 flex items-center justify-center border-r md:aspect-square md:w-56 shrink-0 overflow-hidden">
+            {(reservation as any).propertyImage && !imageError ? (
+              <img 
+                src={(reservation as any).propertyImage} 
+                alt={reservation.propertyName}
+                className="h-full w-full object-cover"
+                onError={() => setImageError(true)}
+              />
+            ) : (
+              <ImageIcon className="h-8 w-8 text-muted-foreground/30" />
+            )}
           </div>
 
-          <div className="mt-5 grid grid-cols-2 gap-y-4 text-sm">
-            <div className="flex items-start gap-2">
-              <CalendarDays className="h-4 w-4 mt-0.5 text-muted-foreground" />
+          <div className="flex flex-1 flex-col p-5">
+            <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="text-xs text-muted-foreground mb-0.5">Check-in</p>
-                <p className="font-medium">{formatShortDateCard(reservation.checkInDate)}</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-2">
-              <Clock className="h-4 w-4 mt-0.5 text-muted-foreground" />
-              <div>
-                <p className="text-xs text-muted-foreground mb-0.5">Check-out</p>
-                <p className="font-medium">{formatShortDateCard(reservation.checkOutDate)}</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-2">
-              <Users className="h-4 w-4 mt-0.5 text-muted-foreground" />
-              <div>
-                <p className="text-xs text-muted-foreground mb-0.5">Huéspedes</p>
-                <p className="font-medium">{reservation.guestsCount}</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-2">
-              <CreditCard className="h-4 w-4 mt-0.5 text-muted-foreground" />
-              <div>
-                <p className="text-xs text-muted-foreground mb-0.5">Total</p>
-                <p className="font-medium text-primary">
-                  ${reservation.totalPrice?.toFixed(2)}
+                <h3 className="font-semibold text-lg">{reservation.propertyName}</h3>
+                <p className="flex items-center gap-1.5 text-sm text-muted-foreground mt-0.5">
+                  <MapPin className="h-4 w-4" />
+                  {(reservation as any).propertyCity && (reservation as any).propertyDepartment
+                    ? `${(reservation as any).propertyCity}, ${(reservation as any).propertyDepartment}`
+                    : "Ubicación no disponible"}
                 </p>
               </div>
+              <Badge className={cn("font-medium", statusColors[reservation.reservationStatus] || "bg-gray-100")}>
+                {statusLabels[reservation.reservationStatus] || reservation.reservationStatus}
+              </Badge>
+            </div>
+
+            <div className="mt-5 grid grid-cols-2 gap-y-4 text-sm">
+              <div className="flex items-start gap-2">
+                <CalendarDays className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Check-in</p>
+                  <p className="font-medium">{formatShortDateCard(reservation.checkInDate)}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <Clock className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Check-out</p>
+                  <p className="font-medium">{formatShortDateCard(reservation.checkOutDate)}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <Users className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Huéspedes</p>
+                  <p className="font-medium">{reservation.guestsCount}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <CreditCard className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Total</p>
+                  <p className="font-medium text-primary">
+                    ${reservation.totalPrice?.toFixed(2)}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleViewDetails(reservation)}
+              >
+                Ver Detalles <ChevronRight className="ml-1 h-4 w-4" />
+              </Button>
+
+              {(reservation.reservationStatus === "ACTIVE" || reservation.reservationStatus === "RESERVED") && (
+                <>
+                  <Button variant="outline" size="sm" className="bg-muted/30">
+                    <Key className="mr-1 h-4 w-4 text-muted-foreground" /> 
+                    <span className="text-muted-foreground">Pendiente</span>
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleOpenExtend(reservation)}
+                  >
+                    Extender
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive hover:bg-destructive hover:text-destructive-foreground border-destructive/30"
+                    onClick={() => {
+                      setSelectedReservation(reservation);
+                      setShowCancelDialog(true);
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                </>
+              )}
+
+              {reservation.reservationStatus === "COMPLETED" && (
+                <Button variant="outline" size="sm">
+                  <Star className="mr-1 h-4 w-4" /> Calificar
+                </Button>
+              )}
             </div>
           </div>
-
-          <div className="mt-5 flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleViewDetails(reservation)}
-            >
-              Ver Detalles <ChevronRight className="ml-1 h-4 w-4" />
-            </Button>
-
-            {(reservation.reservationStatus === "ACTIVE" || reservation.reservationStatus === "RESERVED") && (
-              <>
-                <Button variant="outline" size="sm" className="bg-muted/30">
-                  <Key className="mr-1 h-4 w-4 text-muted-foreground" /> 
-                  <span className="text-muted-foreground">Pendiente</span>
-                </Button>
-                
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setSelectedReservation(reservation);
-                    setShowExtendDialog(true);
-                  }}
-                >
-                  Extender
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-destructive hover:bg-destructive hover:text-destructive-foreground border-destructive/30"
-                  onClick={() => {
-                    setSelectedReservation(reservation);
-                    setShowCancelDialog(true);
-                  }}
-                >
-                  Cancelar
-                </Button>
-              </>
-            )}
-
-            {reservation.reservationStatus === "COMPLETED" && (
-              <Button variant="outline" size="sm">
-                <Star className="mr-1 h-4 w-4" /> Calificar
-              </Button>
-            )}
-          </div>
         </div>
-      </div>
-    </Card>
-  );
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -342,7 +405,6 @@ export default function ReservationsPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Detail Dialog Real */}
       <Dialog 
         open={showDetailDialog} 
         onOpenChange={(open) => {
@@ -409,7 +471,6 @@ export default function ReservationsPage() {
                     </div>
                   )}
                   <div className="flex justify-between">
-                    {/* Asumiendo que obtienes el depósito, si no viene directo en detail, puedes usar el monto estático del diseño */}
                     <span>Depósito de garantía</span>
                     <span>$150.00</span>
                   </div>
@@ -438,7 +499,6 @@ export default function ReservationsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Extend Dialog */}
       <Dialog open={showExtendDialog} onOpenChange={setShowExtendDialog}>
         <DialogContent className="max-w-[425px]">
           <DialogHeader>
@@ -448,6 +508,13 @@ export default function ReservationsPage() {
             </DialogDescription>
           </DialogHeader>
           
+          {extendError && (
+            <div className="rounded-lg bg-red-50 border border-red-200 p-3 flex items-start gap-3 mb-2">
+              <AlertTriangle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+              <p className="text-sm text-red-800 font-medium">{extendError}</p>
+            </div>
+          )}
+
           {selectedReservation && (
             <div className="space-y-5 py-4">
               <div>
@@ -482,11 +549,16 @@ export default function ReservationsPage() {
                     <Calendar
                       mode="single"
                       selected={newCheckoutDate}
-                      onSelect={setNewCheckoutDate}
+                      onSelect={(date) => {
+                         setNewCheckoutDate(date);
+                         setExtendError(null);
+                      }}
+                      defaultMonth={new Date(selectedReservation.checkOutDate)}
                       disabled={(date) => {
                         const checkOut = new Date(selectedReservation.checkOutDate);
                         checkOut.setHours(0, 0, 0, 0);
-                        return date <= checkOut;
+                        date.setHours(0, 0, 0, 0);
+                        return date.getTime() <= checkOut.getTime();
                       }}
                     />
                   </PopoverContent>
@@ -497,17 +569,46 @@ export default function ReservationsPage() {
                 <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5 block">
                   Método de Pago
                 </Label>
-                <Select defaultValue="card">
+                <Select value={extendPaymentMethod} onValueChange={(v) => {setExtendPaymentMethod(v); setExtendError(null);}}>
                   <SelectTrigger className="w-full h-11">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="card">Tarjeta de Crédito/Débito</SelectItem>
-                    <SelectItem value="transfer">Transferencia Bancaria</SelectItem>
-                    <SelectItem value="cash">Efectivo</SelectItem>
+                    <SelectItem value="CARD">Tarjeta de Crédito/Débito</SelectItem>
+                    <SelectItem value="TRANSFER">Transferencia Bancaria</SelectItem>
+                    <SelectItem value="CASH">Efectivo</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+
+              {newCheckoutDate && selectedDetail?.property && (
+                <div className="rounded-xl bg-secondary/50 p-4">
+                  <h4 className="font-semibold text-sm mb-3">Costo de Extensión</h4>
+                  {(() => {
+                    const currentCheckout = new Date(selectedReservation.checkOutDate);
+                    currentCheckout.setHours(0,0,0,0);
+                    const newCheckout = new Date(newCheckoutDate);
+                    newCheckout.setHours(0,0,0,0);
+                    
+                    const additionalNights = Math.round((newCheckout.getTime() - currentCheckout.getTime()) / (1000 * 60 * 60 * 24));
+                    const basePrice = selectedDetail.property.basePricePerNight || 0;
+                    const totalExtension = additionalNights * basePrice;
+
+                    return (
+                      <div className="space-y-2 text-sm text-muted-foreground">
+                        <div className="flex justify-between">
+                          <span>${basePrice.toFixed(2)} x {additionalNights} {additionalNights === 1 ? 'noche adicional' : 'noches adicionales'}</span>
+                          <span>${totalExtension.toFixed(2)}</span>
+                        </div>
+                        <div className="mt-2 flex justify-between border-t border-border pt-3 font-bold text-foreground">
+                          <span>Total a pagar hoy</span>
+                          <span className="text-primary">${totalExtension.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
             </div>
           )}
           
@@ -516,20 +617,50 @@ export default function ReservationsPage() {
               variant="outline"
               onClick={() => setShowExtendDialog(false)}
               className="h-11"
+              disabled={isExtending}
             >
               Cancelar
             </Button>
             <Button 
-              disabled={!newCheckoutDate} 
-              className="h-11 bg-[#DF9D89] hover:bg-[#D08B76] text-white"
+              disabled={!newCheckoutDate || isExtending} 
+              className="h-11"
+              onClick={handleConfirmExtension}
             >
-              Confirmar Extensión
+              {isExtending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Procesando...
+                </>
+              ) : (
+                "Confirmar Extensión"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Cancel Dialog */}
+      <Dialog open={showExtendSuccess} onOpenChange={setShowExtendSuccess}>
+         <DialogContent className="max-w-sm sm:max-w-[425px]">
+           <div className="flex flex-col items-center justify-center p-6 text-center space-y-4">
+             <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
+               <CheckCircle2 className="h-6 w-6 text-green-600" />
+             </div>
+             <DialogTitle className="text-xl">¡Reserva Extendida!</DialogTitle>
+             <DialogDescription className="text-base text-center">
+               Tu reserva para <strong>{selectedReservation?.propertyName}</strong> ha sido extendida con éxito. Las nuevas fechas y totales ya están reflejados en tu panel.
+             </DialogDescription>
+             <Button 
+               className="w-full mt-4 h-11" 
+               onClick={() => {
+                 setShowExtendSuccess(false);
+               }}
+             >
+               Entendido
+             </Button>
+           </div>
+         </DialogContent>
+      </Dialog>
+
       <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
         <DialogContent className="max-w-[400px]">
           <DialogHeader>

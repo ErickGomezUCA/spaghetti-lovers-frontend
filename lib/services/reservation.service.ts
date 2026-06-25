@@ -1,6 +1,6 @@
 import { apiClient } from "@/lib/clients/api-client";
 import { ApiResponse } from "@/types/api-responses";
-import { ReservationResponse, LandlordReservationSummaryResponse, ReservationDetailResponse } from "@/types/api-responses";
+import { ReservationResponse, LandlordReservationSummaryResponse, ReservationDetailResponse, ReservationExtensionResponse} from "@/types/api-responses";
 
 export const reservationService = {
   
@@ -44,6 +44,13 @@ export const reservationService = {
 
   createReservation: async (data: { propertyId: string, checkInDate: string, checkOutDate: string, guestsCount: number, paymentMethod: string }) => {
     return await apiClient.post<{ data: ReservationResponse }>('/reservations', data);
+  },
+
+  extendReservation: async (reservationId: string, data: { newCheckOutDate: string; paymentMethod: string }) => {
+    return await apiClient.post<ApiResponse<ReservationExtensionResponse>>(
+      `/reservations/${reservationId}/extend`,
+      data
+    );
   },
 };
 
