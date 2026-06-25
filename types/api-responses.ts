@@ -161,3 +161,14 @@ export type Property = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type AccessCode = {
+    id: string;
+    propertyId: string;
+    reservationId: string;
+    code: string;
+    codeType: string;
+    validFrom: string;
+    validUntil: string;
+    isActive: boolean;
+};

@@ -1,27 +1,57 @@
 'use client'
-
+import { accessCodeService } from "@/lib/services/access-code.service"
+import { AccessCode } from "@/types/api-responses"
 import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Key, Copy, CheckCircle2, Clock, Home, CalendarDays, Eye, EyeOff } from 'lucide-react'
 import { mockReservations } from '@/lib/mock-data'
 
 export default function AccessCodesPage() {
-  const [showCode, setShowCode] = useState<string | null>(null)
-  const [copiedCode, setCopiedCode] = useState<string | null>(null)
+    const [showCode, setShowCode] = useState<string | null>(null)
+    const [copiedCode, setCopiedCode] = useState<string | null>(null)
+    const [accessCodes, setAccessCodes] = useState<Record<string, AccessCode>>({})
+    const [loadingCode, setLoadingCode] = useState<string | null>(null)
+    const [codeError, setCodeError] = useState<string | null>(null)
 
   // Get reservations with access codes (active or reserved)
-  const reservationsWithCodes = mockReservations.filter(
-    r => r.accessCode && (r.reservationStatus === 'active' || r.reservationStatus === 'reserved')
-  )
+    const reservationsWithCodes = mockReservations.filter(
+        r => r.reservationStatus === 'active' || r.reservationStatus === 'reserved'
+    )
 
   const handleCopyCode = (code: string) => {
     navigator.clipboard.writeText(code)
     setCopiedCode(code)
     setTimeout(() => setCopiedCode(null), 2000)
   }
+
+  const handleLoadAccessCode = async (reservationId: string) => {
+        setCodeError(null)
+
+        if (accessCodes[reservationId]) {
+            setShowCode(showCode === reservationId ? null : reservationId)
+            return
+        }
+
+        setLoadingCode(reservationId)
+
+        try {
+            const response = await accessCodeService.getByReservationId(reservationId)
+
+            setAccessCodes((prev) => ({
+                ...prev,
+                [reservationId]: response.data,
+            }))
+
+            setShowCode(reservationId)
+        } catch (error) {
+            console.error("Error loading access code:", error)
+            setCodeError("No se pudo cargar el código de acceso para esta reserva.")
+        } finally {
+            setLoadingCode(null)
+        }
+    }
 
   const isCodeActive = (reservation: typeof mockReservations[0]) => {
     const today = new Date()
@@ -53,6 +83,15 @@ export default function AccessCodesPage() {
           </div>
         </CardContent>
       </Card>
+
+        {codeError && (
+            <Card className="border-destructive/30 bg-destructive/10">
+                <CardContent className="p-4">
+                    <p className="text-sm text-destructive">{codeError}</p>
+                </CardContent>
+            </Card>
+        )}
+
 
       {/* Access Codes List */}
       <div className="space-y-4">
@@ -113,36 +152,43 @@ export default function AccessCodesPage() {
                       <div className="flex items-center gap-2">
                         <div className="rounded-lg bg-secondary px-4 py-2">
                           <span className="font-mono text-lg font-bold">
-                            {showCode === reservation.id 
-                              ? reservation.accessCode 
-                              : '• • • • • •'
+                            {showCode === reservation.id && accessCodes[reservation.id]
+                                ? accessCodes[reservation.id].code
+                                : '• • • • • •'
                             }
                           </span>
                         </div>
-                        <Button 
-                          variant="outline" 
-                          size="icon"
-                          onClick={() => setShowCode(
-                            showCode === reservation.id ? null : reservation.id
-                          )}
-                        >
-                          {showCode === reservation.id ? (
-                            <EyeOff className="h-4 w-4" />
-                          ) : (
-                            <Eye className="h-4 w-4" />
-                          )}
+                          <Button
+                              variant="outline"
+                              size="icon"
+                              disabled={loadingCode === reservation.id}
+                              onClick={() => handleLoadAccessCode(reservation.id)}
+                          >
+                            {loadingCode === reservation.id ? (
+                                <span className="text-xs">...</span>
+                            ) : showCode === reservation.id ? (
+                                <EyeOff className="h-4 w-4" />
+                            ) : (
+                                <Eye className="h-4 w-4" />
+                            )}
                         </Button>
-                        <Button 
-                          variant="outline" 
-                          size="icon"
-                          onClick={() => reservation.accessCode && handleCopyCode(reservation.accessCode)}
-                        >
-                          {copiedCode === reservation.accessCode ? (
-                            <CheckCircle2 className="h-4 w-4 text-green-600" />
-                          ) : (
-                            <Copy className="h-4 w-4" />
-                          )}
-                        </Button>
+                          <Button
+                              variant="outline"
+                              size="icon"
+                              disabled={!accessCodes[reservation.id]?.code}
+                              onClick={() => {
+                                  const code = accessCodes[reservation.id]?.code
+                                  if (code) {
+                                      handleCopyCode(code)
+                                  }
+                              }}
+                          >
+                              {copiedCode === accessCodes[reservation.id]?.code ? (
+                                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              ) : (
+                                  <Copy className="h-4 w-4" />
+                              )}
+                          </Button>
                       </div>
 
                       {!isActive && (
