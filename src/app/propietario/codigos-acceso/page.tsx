@@ -1,6 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { accessCodeService } from "@/lib/services/access-code.service"
+import { AccessCodeDetailResponse } from "@/types/api-responses"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -29,69 +31,16 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  RefreshCw,
 } from "lucide-react"
 
-// Mock data
-const accessCodes = [
-  {
-    id: "ACC-001",
-    reservationId: "RES-001",
-    property: "Apartamento Centro Histórico",
-    tenant: "María García",
-    code: "A7X9K2",
-    codeType: "access_code",
-    validFrom: "2024-06-15",
-    validUntil: "2024-06-20",
-    isActive: true,
-    createdAt: "2024-06-10",
-  },
-  {
-    id: "ACC-002",
-    reservationId: "RES-001",
-    property: "Apartamento Centro Histórico",
-    tenant: "María García",
-    code: "R3M8P5",
-    codeType: "recovery_code",
-    validFrom: "2024-06-15",
-    validUntil: "2024-06-20",
-    isActive: true,
-    createdAt: "2024-06-10",
-  },
-  {
-    id: "ACC-003",
-    reservationId: "RES-002",
-    property: "Casa de Playa Costa del Sol",
-    tenant: "Carlos López",
-    code: "B4Y6L1",
-    codeType: "access_code",
-    validFrom: "2024-06-18",
-    validUntil: "2024-06-25",
-    isActive: true,
-    createdAt: "2024-06-08",
-  },
-  {
-    id: "ACC-004",
-    reservationId: "RES-003",
-    property: "Loft Moderno Zona Rosa",
-    tenant: "Ana Martínez",
-    code: "C2Z5N8",
-    codeType: "access_code",
-    validFrom: "2024-05-01",
-    validUntil: "2024-05-30",
-    isActive: false,
-    createdAt: "2024-04-20",
-  },
-]
-
 const codeTypeLabels: Record<string, string> = {
-  access_code: "Código de Acceso",
-  recovery_code: "Código de Recuperación",
+    ACCESS_CODE: "Código de Acceso",
+    RECOVERY_CODE: "Código de Recuperación",
 }
 
 const codeTypeColors: Record<string, string> = {
-  access_code: "bg-blue-100 text-blue-700 border-blue-200",
-  recovery_code: "bg-purple-100 text-purple-700 border-purple-200",
+    ACCESS_CODE: "bg-blue-100 text-blue-700 border-blue-200",
+    RECOVERY_CODE: "bg-purple-100 text-purple-700 border-purple-200",
 }
 
 export default function AccessCodesPage() {
@@ -99,17 +48,44 @@ export default function AccessCodesPage() {
   const [statusFilter, setStatusFilter] = useState("all")
   const [visibleCodes, setVisibleCodes] = useState<Set<string>>(new Set())
   const [copiedCode, setCopiedCode] = useState<string | null>(null)
+  const [accessCodes, setAccessCodes] = useState<AccessCodeDetailResponse[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const filteredCodes = accessCodes.filter((code) => {
-    const matchesSearch =
-      code.property.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      code.tenant.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      code.reservationId.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = statusFilter === "all" || 
-      (statusFilter === "active" && code.isActive) ||
-      (statusFilter === "inactive" && !code.isActive)
-    return matchesSearch && matchesStatus
-  })
+  useEffect(() => {
+      const loadLandlordAccessCodes = async () => {
+          setIsLoading(true)
+          setError(null)
+
+          try {
+              const response = await accessCodeService.getLandlordAccessCodes()
+              setAccessCodes(response.data)
+          } catch (error) {
+              console.error("Error loading landlord access codes:", error)
+              setError("No se pudieron cargar los códigos de acceso.")
+          } finally {
+              setIsLoading(false)
+          }
+      }
+
+      loadLandlordAccessCodes()
+  }, [])
+
+
+    const filteredCodes = accessCodes.filter((code) => {
+        const search = searchTerm.toLowerCase()
+
+        const matchesSearch =
+            code.propertyTitle.toLowerCase().includes(search) ||
+            code.tenantName.toLowerCase().includes(search) ||
+            code.reservationId.toLowerCase().includes(search)
+
+        const matchesStatus =
+            statusFilter === "all" ||
+            code.accessCodeStatus === statusFilter
+
+        return matchesSearch && matchesStatus
+    })
 
   const toggleCodeVisibility = (codeId: string) => {
     const newVisible = new Set(visibleCodes)
@@ -127,26 +103,43 @@ export default function AccessCodesPage() {
     setTimeout(() => setCopiedCode(null), 2000)
   }
 
-  const isCodeValid = (validFrom: string, validUntil: string) => {
-    const now = new Date()
-    const from = new Date(validFrom)
-    const until = new Date(validUntil)
-    return now >= from && now <= until
-  }
-
-  const getCodeStatus = (code: typeof accessCodes[0]) => {
-    if (!code.isActive) return "inactive"
-    if (isCodeValid(code.validFrom, code.validUntil)) return "valid"
-    if (new Date() < new Date(code.validFrom)) return "pending"
-    return "expired"
-  }
-
   const statusInfo: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
-    valid: { label: "Válido", color: "bg-green-100 text-green-700", icon: <CheckCircle className="w-3 h-3" /> },
-    pending: { label: "Pendiente", color: "bg-blue-100 text-blue-700", icon: <Clock className="w-3 h-3" /> },
-    expired: { label: "Expirado", color: "bg-gray-100 text-gray-700", icon: <XCircle className="w-3 h-3" /> },
-    inactive: { label: "Inactivo", color: "bg-red-100 text-red-700", icon: <XCircle className="w-3 h-3" /> },
+      ACTIVE: {
+          label: "Activo",
+          color: "bg-green-100 text-green-700",
+          icon: <CheckCircle className="w-3 h-3" />,
+      },
+      PENDING: {
+          label: "Pendiente",
+          color: "bg-blue-100 text-blue-700",
+          icon: <Clock className="w-3 h-3" />,
+      },
+      EXPIRED: {
+          label: "Expirado",
+          color: "bg-gray-100 text-gray-700",
+          icon: <XCircle className="w-3 h-3" />,
+      },
+      INACTIVE: {
+          label: "Inactivo",
+          color: "bg-red-100 text-red-700",
+          icon: <XCircle className="w-3 h-3" />,
+      },
   }
+
+  const formatDate = (date: string) => {
+        const dateOnly = date.split("T")[0]
+        const [year, month, day] = dateOnly.split("-").map(Number)
+
+        return new Date(year, month - 1, day).toLocaleDateString("es-ES", {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+        })
+    }
+
+    const formatReservationId = (reservationId: string) => {
+        return `RES-${reservationId.slice(0, 8).toUpperCase()}`
+    }
 
   return (
     <div className="p-6 space-y-6">
@@ -179,7 +172,7 @@ export default function AccessCodesPage() {
         <Card className="border-t-4 border-t-green-500">
           <CardContent className="p-4 text-center">
             <p className="text-2xl font-semibold text-green-600">
-              {accessCodes.filter((c) => c.isActive && isCodeValid(c.validFrom, c.validUntil)).length}
+                {accessCodes.filter((c) => c.accessCodeStatus === "ACTIVE").length}
             </p>
             <p className="text-sm text-muted-foreground">Activos ahora</p>
           </CardContent>
@@ -187,7 +180,7 @@ export default function AccessCodesPage() {
         <Card className="border-t-4 border-t-blue-500">
           <CardContent className="p-4 text-center">
             <p className="text-2xl font-semibold text-blue-600">
-              {accessCodes.filter((c) => c.codeType === "access_code").length}
+                {accessCodes.filter((code) => code.codeType === "ACCESS_CODE").length}
             </p>
             <p className="text-sm text-muted-foreground">Códigos de acceso</p>
           </CardContent>
@@ -195,7 +188,7 @@ export default function AccessCodesPage() {
         <Card className="border-t-4 border-t-purple-500">
           <CardContent className="p-4 text-center">
             <p className="text-2xl font-semibold text-purple-600">
-              {accessCodes.filter((c) => c.codeType === "recovery_code").length}
+                {accessCodes.filter((code) => code.codeType === "RECOVERY_CODE").length}
             </p>
             <p className="text-sm text-muted-foreground">Códigos de recuperación</p>
           </CardContent>
@@ -229,8 +222,10 @@ export default function AccessCodesPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="active">Activos</SelectItem>
-                <SelectItem value="inactive">Inactivos</SelectItem>
+                <SelectItem value="ACTIVE">Activos</SelectItem>
+                <SelectItem value="PENDING">Pendientes</SelectItem>
+                <SelectItem value="EXPIRED">Expirados</SelectItem>
+                <SelectItem value="INACTIVE">Inactivos</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -256,13 +251,13 @@ export default function AccessCodesPage() {
             </TableHeader>
             <TableBody>
               {filteredCodes.map((code) => {
-                const status = getCodeStatus(code)
-                const info = statusInfo[status]
+                const status = code.accessCodeStatus
+                const info = statusInfo[code.accessCodeStatus] ?? statusInfo.INACTIVE
                 return (
-                  <TableRow key={code.id}>
-                    <TableCell className="font-medium">{code.reservationId}</TableCell>
-                    <TableCell className="max-w-[150px] truncate">{code.property}</TableCell>
-                    <TableCell>{code.tenant}</TableCell>
+                  <TableRow key={code.accessCodeId}>
+                    <TableCell className="font-medium"> {formatReservationId(code.reservationId)} </TableCell>
+                    <TableCell className="max-w-[150px] truncate">{code.propertyTitle}</TableCell>
+                    <TableCell>{code.tenantName}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className={codeTypeColors[code.codeType]}>
                         {codeTypeLabels[code.codeType]}
@@ -271,15 +266,15 @@ export default function AccessCodesPage() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <code className="font-mono text-lg bg-muted px-2 py-1 rounded">
-                          {visibleCodes.has(code.id) ? code.code : "••••••"}
+                          {visibleCodes.has(code.accessCodeId) ? code.code : "••••••"}
                         </code>
                         <Button
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8"
-                          onClick={() => toggleCodeVisibility(code.id)}
+                          onClick={() => toggleCodeVisibility(code.accessCodeId)}
                         >
-                          {visibleCodes.has(code.id) ? (
+                          {visibleCodes.has(code.accessCodeId) ? (
                             <EyeOff className="w-4 h-4" />
                           ) : (
                             <Eye className="w-4 h-4" />
@@ -287,8 +282,8 @@ export default function AccessCodesPage() {
                         </Button>
                       </div>
                     </TableCell>
-                    <TableCell>{code.validFrom}</TableCell>
-                    <TableCell>{code.validUntil}</TableCell>
+                    <TableCell>{formatDate(code.validFrom)}</TableCell>
+                    <TableCell>{formatDate(code.validUntil)}</TableCell>
                     <TableCell>
                       <Badge className={info.color}>
                         <span className="flex items-center gap-1">
@@ -303,24 +298,14 @@ export default function AccessCodesPage() {
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8"
-                          onClick={() => copyCode(code.code, code.id)}
+                          onClick={() => copyCode(code.code, code.accessCodeId)}
                         >
-                          {copiedCode === code.id ? (
+                          {copiedCode === code.accessCodeId ? (
                             <CheckCircle className="w-4 h-4 text-green-600" />
                           ) : (
                             <Copy className="w-4 h-4" />
                           )}
                         </Button>
-                        {code.isActive && status === "valid" && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            title="Regenerar código"
-                          >
-                            <RefreshCw className="w-4 h-4" />
-                          </Button>
-                        )}
                       </div>
                     </TableCell>
                   </TableRow>

@@ -172,3 +172,27 @@ export type AccessCode = {
     validUntil: string;
     isActive: boolean;
 };
+
+export type AccessCodeStatus = "ACTIVE" | "PENDING" | "EXPIRED" | "INACTIVE";
+
+export type CodeType = "ACCESS_CODE" | "RECOVERY_CODE";
+
+export type AccessCodeDetailResponse = {
+    accessCodeId: string;
+    reservationId: string;
+    propertyId: string;
+    propertyTitle: string;
+    propertyCity: string;
+    propertyDepartment: string;
+    tenantId: string;
+    tenantName: string;
+    code: string;
+    codeType: CodeType;
+    checkInDate: string;
+    checkOutDate: string;
+    validFrom: string;
+    validUntil: string;
+    isActive: boolean;
+    accessCodeStatus: AccessCodeStatus;
+    reservationStatus: string;
+};
