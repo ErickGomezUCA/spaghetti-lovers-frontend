@@ -417,6 +417,10 @@ export default function ReservationsPage() {
                     <span>Tarifa de limpieza</span>
                     <span>${selectedDetail.cleaningFee?.toFixed(2)}</span>
                   </div>
+                  <div className="flex justify-between">
+                      <span>Depósito de garantía</span>
+                      <span>${selectedDetail.securityDepositAmount?.toFixed(2) || "0.00"}</span>
+                  </div>
                   {selectedDetail.longStayDiscount > 0 && (
                     <div className="flex justify-between text-green-600">
                       <span>Descuento larga estadía</span>
