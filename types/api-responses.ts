@@ -162,6 +162,67 @@ export type Property = {
   updatedAt: string;
 };
 
+export type ReservationStatus = "PENDING" | "RESERVED" | "ACTIVE" | "COMPLETED" | "CANCELLED";
+
+export type ReservationResponse = {
+  id: string;
+  propertyName: string;
+  tenantName: string;
+  tenantEmail: string;
+  checkInDate: string;
+  checkOutDate: string;
+  totalNights: number;
+  guestsCount: number;
+  totalPrice: number;
+  reservationStatus: ReservationStatus;
+  propertyCity: string;
+  propertyDepartment: string;
+};
+
+export type LandlordReservationSummaryResponse = {
+  reserved: number;
+  active: number;
+  completed: number;
+  cancelled: number;
+};
+
+export type ReservationDetailResponse = {
+  id: string;
+  checkInDate: string;
+  checkOutDate: string;
+  guestsCount: number;
+  totalNights: number;
+  baseTotal: number;
+  cleaningFee: number;
+  longStayDiscount: number;
+  totalPrice: number;
+  reservationStatus: string;
+  tenantName: string;
+  tenantEmail: string;
+  property: {
+    id: string;
+    title: string;
+    address: string;
+    city: string;
+    department: string;
+    basePricePerNight: number;
+  };
+};
+
+export type PaymentResponse = {
+  id: string;
+  amount: number;
+  paymentType: string;
+  paymentMethod: string;
+  refundAmount: number;
+  createdAt: string;
+  refundedAt?: string;
+};
+
+export type ReservationExtensionResponse = {
+  reservation: ReservationResponse;
+  extensionPayment: PaymentResponse;
+};
 export type AccessCode = {
     id: string;
     propertyId: string;
@@ -197,33 +258,27 @@ export type AccessCodeDetailResponse = {
     reservationStatus: string;
 };
 
-export type ReservationStatus =
-    | "RESERVED"
-    | "ACTIVE"
-    | "COMPLETED"
-    | "CANCELLED"
-
 export type ReservationCancellationPreviewResponse = {
-    reservationId: string
-    reservationStatus: ReservationStatus
-    checkInDate: string
-    checkOutDate: string
-    daysUntilCheckIn: number
-    cancellationPenalty: number
-    reservationRefundAmount: number
-    cleaningFeeRefundAmount: number
-    guaranteeDepositRefundAmount: number
-    totalRefundAmount: number
-}
+    reservationId: string;
+    reservationStatus: ReservationStatus;
+    checkInDate: string;
+    checkOutDate: string;
+    daysUntilCheckIn: number;
+    cancellationPenalty: number;
+    reservationRefundAmount: number;
+    cleaningFeeRefundAmount: number;
+    guaranteeDepositRefundAmount: number;
+    totalRefundAmount: number;
+};
 
 export type ReservationCancellationResponse = {
-    reservationId: string
-    reservationStatus: ReservationStatus
-    cancellationPenalty: number
-    reservationRefundAmount: number
-    cleaningFeeRefundAmount: number
-    guaranteeDepositRefundAmount: number
-    totalRefundAmount: number
-    cancelledAt: string
-}
+    reservationId: string;
+    reservationStatus: ReservationStatus;
+    cancellationPenalty: number;
+    reservationRefundAmount: number;
+    cleaningFeeRefundAmount: number;
+    guaranteeDepositRefundAmount: number;
+    totalRefundAmount: number;
+    cancelledAt: string;
+};
 
