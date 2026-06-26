@@ -1,14 +1,21 @@
-import { apiClient } from "@/lib/clients/api-client";
-import { ApiResponse } from "@/types/api-responses";
-import { ReservationResponse, LandlordReservationSummaryResponse, ReservationDetailResponse, ReservationExtensionResponse} from "@/types/api-responses";
+import { apiClient } from "@/lib/clients/api-client"
+import {
+    ApiResponse,
+    ReservationResponse,
+    LandlordReservationSummaryResponse,
+    ReservationDetailResponse,
+    ReservationExtensionResponse,
+    ReservationCancellationPreviewResponse,
+    ReservationCancellationResponse,
+} from "@/types/api-responses"
 
 export const reservationService = {
-  
+
   getMyReservations: async (
-    page: number = 0, 
-    pageSize: number = 10, 
-    sortBy?: string, 
-    sortOrder?: string, 
+    page: number = 0,
+    pageSize: number = 10,
+    sortBy?: string,
+    sortOrder?: string,
     status?: string
   ) => {
     const params = new URLSearchParams({
@@ -38,13 +45,24 @@ export const reservationService = {
     return apiClient.get<ApiResponse<LandlordReservationSummaryResponse>>("/reservations/landlord/summary");
   },
 
-  getLandlordReservationDetail: async (id: string) => {
-    return await apiClient.get<{ data: ReservationDetailResponse }>(`/reservations/${id}`);
-  },
+    getLandlordReservationDetail: async (id: string) => {
+        return await apiClient.get<ApiResponse<ReservationDetailResponse>>(
+            `/reservations/${id}`,
+        )
+    },
 
-  createReservation: async (data: { propertyId: string, checkInDate: string, checkOutDate: string, guestsCount: number, paymentMethod: string }) => {
-    return await apiClient.post<{ data: ReservationResponse }>('/reservations', data);
-  },
+    createReservation: async (data: {
+        propertyId: string
+        checkInDate: string
+        checkOutDate: string
+        guestsCount: number
+        paymentMethod: string
+    }) => {
+        return await apiClient.post<ApiResponse<ReservationResponse>>(
+            "/reservations",
+            data,
+        )
+    },
 
   extendReservation: async (reservationId: string, data: { newCheckOutDate: string; paymentMethod: string }) => {
     return await apiClient.post<ApiResponse<ReservationExtensionResponse>>(
@@ -52,5 +70,18 @@ export const reservationService = {
       data
     );
   },
-};
 
+    previewCancellation: (
+        reservationId: string,
+    ): Promise<ApiResponse<ReservationCancellationPreviewResponse>> =>
+        apiClient.get<ApiResponse<ReservationCancellationPreviewResponse>>(
+            `/reservations/${reservationId}/cancellation-preview`,
+        ),
+
+    cancelReservation: (
+        reservationId: string,
+    ): Promise<ApiResponse<ReservationCancellationResponse>> =>
+        apiClient.delete<ApiResponse<ReservationCancellationResponse>>(
+            `/reservations/${reservationId}`,
+        ),
+};

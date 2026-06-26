@@ -5,6 +5,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { reservationService } from "@/lib/services/reservation.service";
+import { ReservationCancellationPreviewResponse } from "@/types/api-responses";
 import {
   Dialog,
   DialogContent,
@@ -45,10 +47,9 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { cn } from "@/utils/cn";
-import { format } from "date-fns";
+import {format} from "date-fns";
 import { es } from "date-fns/locale";
 
-import { reservationService } from "@/lib/services/reservation.service";
 import { ReservationResponse, ReservationDetailResponse } from "@/types/api-responses";
 
 const statusColors: Record<string, string> = {
@@ -74,7 +75,7 @@ const errorTranslations: Record<string, string> = {
 
 const translateApiError = (englishErrorMsg: string) => {
   if (!englishErrorMsg) return "Ha ocurrido un error inesperado al extender la reserva. Por favor, intenta de nuevo.";
-  return errorTranslations[englishErrorMsg] || englishErrorMsg; 
+  return errorTranslations[englishErrorMsg] || englishErrorMsg;
 };
 
 const formatShortDateCard = (dateString: string) => {
@@ -102,7 +103,7 @@ export default function ReservationsPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   const [selectedReservation, setSelectedReservation] = useState<ReservationResponse | null>(null);
-  
+
   const [selectedDetail, setSelectedDetail] = useState<ReservationDetailResponse | null>(null);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
@@ -115,6 +116,13 @@ export default function ReservationsPage() {
   const [showExtendSuccess, setShowExtendSuccess] = useState(false);
 
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [cancellationPreview, setCancellationPreview] =
+      useState<ReservationCancellationPreviewResponse | null>(null);
+  const [isLoadingCancellationPreview, setIsLoadingCancellationPreview] =
+      useState(false);
+  const [isCancellingReservation, setIsCancellingReservation] = useState(false);
+  const [cancellationError, setCancellationError] = useState<string | null>(null);
+
 
   const fetchReservations = async () => {
     setIsLoading(true);
@@ -146,7 +154,7 @@ export default function ReservationsPage() {
     setSelectedReservation(reservation);
     setShowDetailDialog(true);
     setIsDetailLoading(true);
-    
+
     try {
       const res = await reservationService.getLandlordReservationDetail(reservation.id);
       setSelectedDetail(res.data);
@@ -164,7 +172,6 @@ export default function ReservationsPage() {
     setExtendPaymentMethod("CARD");
     setShowExtendDialog(true);
     setIsDetailLoading(true);
-
     try {
       const res = await reservationService.getLandlordReservationDetail(reservation.id);
       setSelectedDetail(res.data);
@@ -176,30 +183,85 @@ export default function ReservationsPage() {
   };
 
   const handleConfirmExtension = async () => {
-    if (!selectedReservation || !newCheckoutDate) return;
+      if (!selectedReservation || !newCheckoutDate) return;
 
-    setExtendError(null);
-    setIsExtending(true);
+      setExtendError(null);
+      setIsExtending(true);
 
-    try {
-      const formattedNewDate = format(newCheckoutDate, 'yyyy-MM-dd');
-      
-      await reservationService.extendReservation(selectedReservation.id, {
-        newCheckOutDate: formattedNewDate,
-        paymentMethod: extendPaymentMethod
-      });
+      try {
+          const formattedNewDate = format(newCheckoutDate, 'yyyy-MM-dd');
 
-      setShowExtendDialog(false);
-      setShowExtendSuccess(true);
-      fetchReservations();
-    } catch (error: any) {
-      console.error("Error al extender:", error);
-      const translatedMsg = translateApiError(error.message);
-      setExtendError(translatedMsg);
-    } finally {
-      setIsExtending(false);
-    }
+          await reservationService.extendReservation(selectedReservation.id, {
+              newCheckOutDate: formattedNewDate,
+              paymentMethod: extendPaymentMethod
+          });
+
+          setShowExtendDialog(false);
+          setShowExtendSuccess(true);
+          fetchReservations();
+      } catch (error: any) {
+          console.error("Error al extender:", error);
+          const translatedMsg = translateApiError(error.message);
+          setExtendError(translatedMsg);
+      } finally {
+          setIsExtending(false);
+      }
   };
+
+      const handleOpenCancelDialog = async (reservation: ReservationResponse) => {
+          setSelectedReservation(reservation)
+          setShowCancelDialog(true)
+          setCancellationPreview(null)
+          setCancellationError(null)
+          setIsLoadingCancellationPreview(true)
+
+          try {
+              const response = await reservationService.previewCancellation(reservation.id)
+              setCancellationPreview(response.data)
+          } catch (error) {
+              console.error("Error loading cancellation preview:", error)
+              setCancellationError(
+                  "No se pudo cargar el resumen de cancelación para esta reserva.",
+              )
+          } finally {
+              setIsLoadingCancellationPreview(false)
+          }
+      };
+
+      const handleConfirmCancellation = async () => {
+          if (!selectedReservation) return
+
+          setIsCancellingReservation(true)
+          setCancellationError(null)
+
+          try {
+              const response = await reservationService.cancelReservation(
+                  selectedReservation.id,
+              )
+
+              setReservations((prev) =>
+                  prev.map((reservation) =>
+                      reservation.id === response.data.reservationId
+                          ? {
+                              ...reservation,
+                              reservationStatus: "CANCELLED",
+                          }
+                          : reservation,
+                  ),
+              )
+
+              setShowCancelDialog(false)
+              setSelectedReservation(null)
+              setCancellationPreview(null)
+
+              fetchReservations()
+          } catch (error) {
+              console.error("Error cancelling reservation:", error)
+              setCancellationError("No se pudo cancelar la reserva.")
+          } finally {
+              setIsCancellingReservation(false)
+          }
+      }
 
   const ReservationCard = ({ reservation }: { reservation: ReservationResponse }) => {
     const [imageError, setImageError] = useState(false);
@@ -209,8 +271,8 @@ export default function ReservationsPage() {
         <div className="flex flex-col md:flex-row">
           <div className="aspect-video w-full bg-muted/50 flex items-center justify-center border-r md:aspect-square md:w-56 shrink-0 overflow-hidden">
             {(reservation as any).propertyImage && !imageError ? (
-              <img 
-                src={(reservation as any).propertyImage} 
+              <img
+                src={(reservation as any).propertyImage}
                 alt={reservation.propertyName}
                 className="h-full w-full object-cover"
                 onError={() => setImageError(true)}
@@ -281,10 +343,10 @@ export default function ReservationsPage() {
               {(reservation.reservationStatus === "ACTIVE" || reservation.reservationStatus === "RESERVED") && (
                 <>
                   <Button variant="outline" size="sm" className="bg-muted/30">
-                    <Key className="mr-1 h-4 w-4 text-muted-foreground" /> 
+                    <Key className="mr-1 h-4 w-4 text-muted-foreground" />
                     <span className="text-muted-foreground">Pendiente</span>
                   </Button>
-                  
+
                   <Button
                     variant="outline"
                     size="sm"
@@ -293,15 +355,12 @@ export default function ReservationsPage() {
                     Extender
                   </Button>
                   <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-destructive hover:bg-destructive hover:text-destructive-foreground border-destructive/30"
-                    onClick={() => {
-                      setSelectedReservation(reservation);
-                      setShowCancelDialog(true);
-                    }}
+                      variant="outline"
+                      size="sm"
+                      className="text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                      onClick={() => handleOpenCancelDialog(reservation)}
                   >
-                    Cancelar
+                      Cancelar
                   </Button>
                 </>
               )}
@@ -405,8 +464,8 @@ export default function ReservationsPage() {
         </TabsContent>
       </Tabs>
 
-      <Dialog 
-        open={showDetailDialog} 
+      <Dialog
+        open={showDetailDialog}
         onOpenChange={(open) => {
           setShowDetailDialog(open);
           if (!open) setSelectedDetail(null);
@@ -419,7 +478,7 @@ export default function ReservationsPage() {
               {selectedReservation?.propertyName}
             </DialogDescription>
           </DialogHeader>
-          
+
           {isDetailLoading ? (
             <div className="flex justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -507,7 +566,7 @@ export default function ReservationsPage() {
               Selecciona la nueva fecha de check-out
             </DialogDescription>
           </DialogHeader>
-          
+
           {extendError && (
             <div className="rounded-lg bg-red-50 border border-red-200 p-3 flex items-start gap-3 mb-2">
               <AlertTriangle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
@@ -589,7 +648,7 @@ export default function ReservationsPage() {
                     currentCheckout.setHours(0,0,0,0);
                     const newCheckout = new Date(newCheckoutDate);
                     newCheckout.setHours(0,0,0,0);
-                    
+
                     const additionalNights = Math.round((newCheckout.getTime() - currentCheckout.getTime()) / (1000 * 60 * 60 * 24));
                     const basePrice = selectedDetail.property.basePricePerNight || 0;
                     const totalExtension = additionalNights * basePrice;
@@ -611,7 +670,7 @@ export default function ReservationsPage() {
               )}
             </div>
           )}
-          
+
           <DialogFooter className="gap-2 sm:gap-0 mt-2">
             <Button
               variant="outline"
@@ -621,8 +680,8 @@ export default function ReservationsPage() {
             >
               Cancelar
             </Button>
-            <Button 
-              disabled={!newCheckoutDate || isExtending} 
+            <Button
+              disabled={!newCheckoutDate || isExtending}
               className="h-11"
               onClick={handleConfirmExtension}
             >
@@ -649,8 +708,8 @@ export default function ReservationsPage() {
              <DialogDescription className="text-base text-center">
                Tu reserva para <strong>{selectedReservation?.propertyName}</strong> ha sido extendida con éxito. Las nuevas fechas y totales ya están reflejados en tu panel.
              </DialogDescription>
-             <Button 
-               className="w-full mt-4 h-11" 
+             <Button
+               className="w-full mt-4 h-11"
                onClick={() => {
                  setShowExtendSuccess(false);
                }}
@@ -669,13 +728,85 @@ export default function ReservationsPage() {
               ¿Estás seguro de que deseas cancelar esta reserva?
             </DialogDescription>
           </DialogHeader>
-          
-          <div className="py-8 my-2 text-center border rounded-xl bg-muted/20">
-             <AlertTriangle className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
-             <p className="text-sm font-medium text-muted-foreground">Módulo de cancelaciones</p>
-             <p className="text-xs text-muted-foreground mt-1">Pendiente de conexión</p>
-          </div>
+          {selectedReservation && (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 text-amber-600" />
+                  <div>
+                    <h4 className="font-semibold text-amber-800">
+                      Política de Cancelación
+                    </h4>
+                      {isLoadingCancellationPreview ? (
+                          <p className="mt-2 text-sm text-amber-700">
+                              Cargando resumen de cancelación...
+                          </p>
+                      ) : cancellationPreview ? (
+                          <div className="mt-2 text-sm text-amber-700">
+                              <p>
+                                  {cancellationPreview.cancellationPenalty === 0
+                                      ? "Reembolso completo según la política de cancelación."
+                                      : "Esta cancelación aplica penalización."}
+                              </p>
 
+                              <div className="mt-2 space-y-1">
+                                  <div className="flex justify-between">
+                                      <span>Penalización:</span>
+                                      <span className="font-medium">
+          ${cancellationPreview.cancellationPenalty.toFixed(2)}
+        </span>
+                                  </div>
+
+                                  <div className="flex justify-between">
+                                      <span>Reembolso base:</span>
+                                      <span className="font-medium">
+          ${cancellationPreview.reservationRefundAmount.toFixed(2)}
+        </span>
+                                  </div>
+
+                                  <div className="flex justify-between">
+                                      <span>Tarifa limpieza:</span>
+                                      <span className="font-medium">
+          ${cancellationPreview.cleaningFeeRefundAmount.toFixed(2)}
+        </span>
+                                  </div>
+
+                                  <div className="flex justify-between">
+                                      <span>Depósito:</span>
+                                      <span className="font-medium">
+          ${cancellationPreview.guaranteeDepositRefundAmount.toFixed(2)}
+        </span>
+                                  </div>
+
+                                  <div className="mt-2 flex justify-between border-t border-amber-200 pt-2 font-bold">
+                                      <span>Total a reembolsar:</span>
+                                      <span>${cancellationPreview.totalRefundAmount.toFixed(2)}</span>
+                                  </div>
+                              </div>
+                          </div>
+                      ) : (
+                          <p className="mt-2 text-sm text-amber-700">
+                              No se pudo obtener el resumen de cancelación.
+                          </p>
+                      )}
+                  </div>
+                </div>
+              </div>
+                {cancellationError && (
+                    <p className="text-sm text-destructive">{cancellationError}</p>
+                )}
+                <div className="rounded-lg bg-secondary p-4">
+                    <h4 className="font-semibold">Propiedad</h4>
+                    <p className="text-sm text-muted-foreground">
+                        {selectedReservation.propertyName}
+                    </p>
+                    <p className="mt-2 text-sm">
+                        {formatShortDateCard(selectedReservation.checkInDate)} -{" "}
+                        {formatShortDateCard(selectedReservation.checkOutDate)}
+                    </p>
+                </div>
+            </div>
+          )}
           <DialogFooter>
             <Button
               variant="outline"
@@ -683,7 +814,17 @@ export default function ReservationsPage() {
             >
               Volver
             </Button>
-            <Button variant="destructive" disabled>Confirmar Cancelación</Button>
+            <Button
+                variant="destructive"
+                disabled={
+                    isLoadingCancellationPreview ||
+                    isCancellingReservation ||
+                    !cancellationPreview
+                }
+                onClick={handleConfirmCancellation}
+            >
+                {isCancellingReservation ? "Cancelando..." : "Confirmar Cancelación"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
