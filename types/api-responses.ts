@@ -194,6 +194,7 @@ export type ReservationDetailResponse = {
   totalNights: number;
   baseTotal: number;
   cleaningFee: number;
+  securityDepositAmount: number;
   longStayDiscount: number;
   totalPrice: number;
   reservationStatus: string;

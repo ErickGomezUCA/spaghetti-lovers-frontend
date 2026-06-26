@@ -530,8 +530,8 @@ export default function ReservationsPage() {
                     </div>
                   )}
                   <div className="flex justify-between">
-                    <span>Depósito de garantía</span>
-                    <span>$150.00</span>
+                      <span>Depósito de garantía</span>
+                      <span>${selectedDetail.securityDepositAmount?.toFixed(2) || "0.00"}</span>
                   </div>
                   <div className="mt-2 flex justify-between border-t border-border pt-3 font-bold text-base text-foreground">
                     <span>Total</span>
