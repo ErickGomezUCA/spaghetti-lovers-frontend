@@ -282,3 +282,16 @@ export type ReservationCancellationResponse = {
     cancelledAt: string;
 };
 
+export type NotificationType = "INFO" | "REMINDER" | "MAINTENANCE"
+
+export type NotificationResponse = {
+    id: string
+    userId: string
+    reservationId: string | null
+    type: NotificationType
+    title: string
+    message: string
+    isRead: boolean
+    createdAt: string
+}
+
