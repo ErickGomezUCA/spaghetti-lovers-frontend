@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/clients/api-client";
-import { ApiResponse, Property, AvailabilityResponse } from "@/types/api-responses";
+import { ApiResponse, Property, AvailabilityResponse, PropertyReportResponse } from "@/types/api-responses";
 import {
   AttachPhotoRequest,
   CreatePropertyRequest,
@@ -26,6 +26,11 @@ export const propertyService = {
   checkAvailability: (id: string, startDate: string, endDate: string) =>
   apiClient.get<ApiResponse<AvailabilityResponse>>(
     `/properties/${id}/availability?startDate=${startDate}&endDate=${endDate}`
+  ),
+
+  getReport: (id: string, startDate: string, endDate: string) =>
+  apiClient.get<ApiResponse<PropertyReportResponse>>(
+    `/properties/${id}/report?startDate=${startDate}&endDate=${endDate}`
   ),
 
   getById: (id: string) =>
