@@ -1,9 +1,9 @@
 export type PaginationMeta = {
   page: number;
   pageSize: number;
-  totalElements: number;
+  totalItems: number;
   totalPages: number;
-  hasNext: boolean;
+  hastNext: boolean;
 };
 
 export type ApiResponse<T> = {
