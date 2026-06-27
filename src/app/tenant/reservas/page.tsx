@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { reservationService } from "@/lib/services/reservation.service";
 import { ReservationCancellationPreviewResponse } from "@/types/api-responses";
+import { StripeCardStep } from "@/components/dialogs/StripeCardStep";
 import {
   Dialog,
   DialogContent,
@@ -115,6 +116,10 @@ export default function ReservationsPage() {
   const [isExtending, setIsExtending] = useState(false);
   const [showExtendSuccess, setShowExtendSuccess] = useState(false);
 
+  const [isExtendStripeStep, setIsExtendStripeStep] = useState(false);
+  const [stripeExtendPaymentId, setStripeExtendPaymentId] = useState<string | null>(null);
+  const [stripeExtendAmount, setStripeExtendAmount] = useState(0);
+
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancellationPreview, setCancellationPreview] =
       useState<ReservationCancellationPreviewResponse | null>(null);
@@ -183,29 +188,42 @@ export default function ReservationsPage() {
   };
 
   const handleConfirmExtension = async () => {
-      if (!selectedReservation || !newCheckoutDate) return;
+    if (!selectedReservation || !newCheckoutDate) return;
 
-      setExtendError(null);
-      setIsExtending(true);
+    setExtendError(null);
+    setIsExtending(true);
 
-      try {
-          const formattedNewDate = format(newCheckoutDate, 'yyyy-MM-dd');
+    try {
+      const formattedNewDate = format(newCheckoutDate, "yyyy-MM-dd");
 
-          await reservationService.extendReservation(selectedReservation.id, {
-              newCheckOutDate: formattedNewDate,
-              paymentMethod: extendPaymentMethod
-          });
+      const res = await reservationService.extendReservation(selectedReservation.id, {
+        newCheckOutDate: formattedNewDate,
+        paymentMethod: extendPaymentMethod,
+      });
 
-          setShowExtendDialog(false);
-          setShowExtendSuccess(true);
-          fetchReservations();
-      } catch (error: any) {
-          console.error("Error al extender:", error);
-          const translatedMsg = translateApiError(error.message);
-          setExtendError(translatedMsg);
-      } finally {
-          setIsExtending(false);
+      if (extendPaymentMethod === "CARD") {
+        const payment = res.data.extensionPayment;
+        setStripeExtendPaymentId(payment.id);
+        setStripeExtendAmount(payment.amount);
+        setIsExtendStripeStep(true);
+      } else {
+        setShowExtendDialog(false);
+        setShowExtendSuccess(true);
+        fetchReservations();
       }
+    } catch (error: any) {
+      console.error("Error al extender:", error);
+      const translatedMsg = translateApiError(error.message);
+      setExtendError(translatedMsg);
+    } finally {
+      setIsExtending(false);
+    }
+  };
+
+  const resetExtendStripeStep = () => {
+    setIsExtendStripeStep(false);
+    setStripeExtendPaymentId(null);
+    setStripeExtendAmount(0);
   };
 
       const handleOpenCancelDialog = async (reservation: ReservationResponse) => {
@@ -558,15 +576,34 @@ export default function ReservationsPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showExtendDialog} onOpenChange={setShowExtendDialog}>
+      <Dialog open={showExtendDialog} onOpenChange={(open) => {
+        setShowExtendDialog(open);
+        if (!open) resetExtendStripeStep();
+      }}>
         <DialogContent className="max-w-[425px]">
           <DialogHeader>
-            <DialogTitle className="text-xl">Extender Reserva</DialogTitle>
+            <DialogTitle className="text-xl">
+              {isExtendStripeStep ? "Pago con Tarjeta" : "Extender Reserva"}
+            </DialogTitle>
             <DialogDescription className="text-base text-muted-foreground">
-              Selecciona la nueva fecha de check-out
+              {isExtendStripeStep ? selectedReservation?.propertyName : "Selecciona la nueva fecha de check-out"}
             </DialogDescription>
           </DialogHeader>
 
+          {isExtendStripeStep && stripeExtendPaymentId ? (
+            <StripeCardStep
+              paymentId={stripeExtendPaymentId}
+              amount={stripeExtendAmount}
+              onSuccess={() => {
+                resetExtendStripeStep();
+                setShowExtendDialog(false);
+                setShowExtendSuccess(true);
+                fetchReservations();
+              }}
+              onBack={resetExtendStripeStep}
+            />
+          ) : (
+          <>
           {extendError && (
             <div className="rounded-lg bg-red-50 border border-red-200 p-3 flex items-start gap-3 mb-2">
               <AlertTriangle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
@@ -695,6 +732,8 @@ export default function ReservationsPage() {
               )}
             </Button>
           </DialogFooter>
+          </>
+          )}
         </DialogContent>
       </Dialog>
 
