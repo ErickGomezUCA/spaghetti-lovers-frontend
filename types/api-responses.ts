@@ -81,6 +81,7 @@ export type UserProfileResponse = {
   ratingsCount: number;
   averageScore: number | null;
   ratings: RatingResponse[];
+  verificationStatus: string | null;
 };
 
 export type ContractStatus = "SIGNED" | "PENDING_SIGNATURES";
