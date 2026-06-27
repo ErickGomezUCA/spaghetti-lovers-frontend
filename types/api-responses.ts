@@ -306,6 +306,17 @@ export type NotificationResponse = {
     createdAt: string
 }
 
+export type ReservationCompletionResponse = {
+    reservationId: string
+    reservationStatus: ReservationStatus
+    guaranteeDepositAmount: number
+    retainedAmount: number
+    guaranteeDepositRefundAmount: number
+    additionalFinePaymentAmount: number
+    completedAt: string
+}
+
+
 
 
 
