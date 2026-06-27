@@ -306,6 +306,21 @@ export type NotificationResponse = {
     createdAt: string
 }
 
+export type BlockType = 'RESERVATION' | 'MAINTENANCE' | 'PREVENTIVE_MAINTENANCE'
+
+export type ConflictResponse = {
+  id: string
+  blockType: BlockType
+  timestampStart: string
+  timestampEnd: string
+  blockedReason: string | null
+}
+
+export type AvailabilityResponse = {
+  available: boolean
+  conflicts: ConflictResponse[]
+}
+
 
 
 
