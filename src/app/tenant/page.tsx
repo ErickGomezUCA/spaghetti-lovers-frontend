@@ -8,6 +8,7 @@ import { CalendarDays, FileText, Key, Wrench, Star, ArrowRight, Home, Clock, Loa
 import Link from 'next/link'
 import { useAuth } from '@/lib/contexts/auth-context'
 import { reservationService } from '@/lib/services/reservation.service'
+import { ratingService } from '@/lib/services/rating.service'
 import { ReservationResponse } from '@/types/api-responses'
 
 const formatShortDate = (dateString: string) => {
@@ -39,22 +40,39 @@ export default function TenantDashboard() {
   
   const [reservations, setReservations] = useState<ReservationResponse[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [averageRating, setAverageRating] = useState(0)
+  const [totalRatings, setTotalRatings] = useState(0)
 
   useEffect(() => {
-    const fetchMyReservations = async () => {
+
+    const fetchDashboardData = async () => {
+      if (!user) return
       setIsLoading(true)
       try {
-        const res = await reservationService.getMyReservations(0, 10);
-        setReservations(res.data || [])
-      } catch (error) {
-        console.error("Error cargando reservas del inquilino:", error)
-      } finally {
+        const [reservationsRes, ratingsRes] = await Promise.all([
+          reservationService.getMyReservations(0, 10),
+          ratingService.getByUser(user.id)
+        ])
+        setReservations(reservationsRes.data || [])
+        setAverageRating(
+          ratingsRes.data?.averageScore ?? 0
+        )
+        setTotalRatings(
+          ratingsRes.data?.totalRatings ?? 0
+        )
+      }
+      catch (error) {
+        console.error(
+          "Error cargando dashboard:",
+          error
+        )
+      }
+      finally {
         setIsLoading(false)
       }
     }
-
-    fetchMyReservations()
-  }, [])
+    fetchDashboardData()
+  }, [user])
 
   const activeReservations = reservations.filter(
     r => r.reservationStatus === 'ACTIVE' || r.reservationStatus === 'RESERVED'
@@ -115,15 +133,26 @@ export default function TenantDashboard() {
           </CardContent>
         </Card>
 
-        {/* Calificación (Pendiente de conexión) */}
+        {/* Calificación */}
         <Card>
           <CardContent className="flex items-center gap-4 p-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green-100">
-              <Star className="h-6 w-6 text-green-600" />
+              <Star className="h-6 w-6 text-green-600 fill-green-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold">—</p>
-              <p className="text-xs text-muted-foreground">Calificación (Pendiente de conexión)</p>
+              <div className="flex items-center gap-2">
+                <p className="text-2xl font-bold">
+                  {isLoading
+                    ? "—"
+                    : averageRating.toFixed(1)}
+                </p>
+                <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {totalRatings > 0
+                  ? `${totalRatings} calificaciones recibidas`
+                  : "Sin calificaciones"}
+              </p>
             </div>
           </CardContent>
         </Card>
