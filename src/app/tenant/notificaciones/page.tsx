@@ -92,44 +92,50 @@ export default function NotificationsPage() {
 
     const markAsRead = async (notificationId: string) => {
         try {
-            const response = await notificationService.markAsRead(notificationId)
+            const response = await notificationService.markAsRead(notificationId);
 
             setNotifications((prev) =>
                 prev.map((notification) =>
                     notification.id === notificationId ? response.data : notification,
                 ),
-            )
+            );
+
+            window.dispatchEvent(new Event("notifications-updated"));
         } catch (error) {
-            console.error("Error marking notification as read:", error)
+            console.error("Error marking notification as read:", error);
         }
-    }
+    };
 
     const markAllAsRead = async () => {
         try {
-            await notificationService.markAllAsRead()
+            await notificationService.markAllAsRead();
 
             setNotifications((prev) =>
                 prev.map((notification) => ({
                     ...notification,
                     isRead: true,
                 })),
-            )
+            );
+
+            window.dispatchEvent(new Event("notifications-updated"));
         } catch (error) {
-            console.error("Error marking all notifications as read:", error)
+            console.error("Error marking all notifications as read:", error);
         }
-    }
+    };
 
     const deleteNotification = async (notificationId: string) => {
         try {
-            await notificationService.deleteNotification(notificationId)
+            await notificationService.deleteNotification(notificationId);
 
             setNotifications((prev) =>
                 prev.filter((notification) => notification.id !== notificationId),
-            )
+            );
+
+            window.dispatchEvent(new Event("notifications-updated"));
         } catch (error) {
-            console.error("Error deleting notification:", error)
+            console.error("Error deleting notification:", error);
         }
-    }
+    };
 
     const formatDate = (dateString: string) => {
         const date = new Date(dateString)
