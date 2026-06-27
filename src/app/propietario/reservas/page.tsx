@@ -42,10 +42,11 @@ import {
   XCircle,
   Clock,
   Loader2,
-  AlertTriangle
+  AlertTriangle,
+  Info
 } from "lucide-react"
 
-import { ReservationResponse, LandlordReservationSummaryResponse, ReservationDetailResponse } from "@/types/api-responses"
+import { ReservationResponse, LandlordReservationSummaryResponse, ReservationDetailResponse, ReservationCompletionResponse, } from "@/types/api-responses"
 
 const statusColors: Record<string, string> = {
   RESERVED: "bg-blue-100 text-blue-700 border-blue-200",
@@ -92,6 +93,11 @@ export default function ReservationsPage() {
       useState(false)
   const [isCancellingReservation, setIsCancellingReservation] = useState(false)
   const [cancellationError, setCancellationError] = useState<string | null>(null)
+  const [showCompleteDialog, setShowCompleteDialog] = useState(false)
+  const [isCompletingReservation, setIsCompletingReservation] = useState(false)
+  const [completionResult, setCompletionResult] =
+      useState<ReservationCompletionResponse | null>(null)
+  const [completionError, setCompletionError] = useState<string | null>(null)
 
   // Cargar lista principal
   useEffect(() => {
@@ -202,6 +208,65 @@ export default function ReservationsPage() {
             setCancellationError("No se pudo cancelar la reserva.")
         } finally {
             setIsCancellingReservation(false)
+        }
+    }
+
+    const handleOpenCompleteDialog = () => {
+        setIsModalOpen(false)
+        setCompletionResult(null)
+        setCompletionError(null)
+        setShowCompleteDialog(true)
+    }
+
+    const handleConfirmCompletion = async () => {
+        if (!selectedDetail) return
+
+        setIsCompletingReservation(true)
+        setCompletionError(null)
+
+        try {
+            const response = await reservationService.completeReservation(
+                selectedDetail.id,
+            )
+
+            setCompletionResult(response.data)
+
+            setSelectedDetail((prev) =>
+                prev
+                    ? {
+                        ...prev,
+                        reservationStatus: "COMPLETED",
+                    }
+                    : prev,
+            )
+
+            setReservations((prev) =>
+                prev.map((reservation) =>
+                    reservation.id === response.data.reservationId
+                        ? {
+                            ...reservation,
+                            reservationStatus: "COMPLETED",
+                        }
+                        : reservation,
+                ),
+            )
+
+            setSummary((prev) =>
+                prev
+                    ? {
+                        ...prev,
+                        active: Math.max(prev.active - 1, 0),
+                        completed: prev.completed + 1,
+                    }
+                    : prev,
+            )
+        } catch (error) {
+            console.error("Error completing reservation:", error)
+            setCompletionError(
+                "No se pudo completar la reserva. Verifica que esté activa, que la fecha de check-out ya haya llegado y que no tenga multas pendientes no permitidas.",
+            )
+        } finally {
+            setIsCompletingReservation(false)
         }
     }
 
@@ -438,8 +503,11 @@ export default function ReservationsPage() {
                   selectedDetail.reservationStatus === "RESERVED") && (
                   <div className="flex gap-2">
                       {selectedDetail.reservationStatus === "ACTIVE" && (
-                          <Button className="flex-1 bg-primary">
-                              Completar Reserva
+                          <Button
+                          className="flex-1 bg-primary"
+                          onClick={handleOpenCompleteDialog}
+                          >
+                          Completar Reserva
                           </Button>
                       )}
 
@@ -581,6 +649,127 @@ export default function ReservationsPage() {
                     >
                         {isCancellingReservation ? "Cancelando..." : "Confirmar Cancelación"}
                     </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+        {/* Complete Reservation Dialog */}
+        <Dialog open={showCompleteDialog} onOpenChange={setShowCompleteDialog}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Completar Reserva</DialogTitle>
+                    <DialogDescription>
+                        Esta acción completará la reserva y procesará el reembolso del depósito
+                        de garantía según las multas pendientes por daños.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4">
+                    {selectedDetail && (
+                        <div className="rounded-lg bg-secondary p-4">
+                            <h4 className="font-semibold">Reserva</h4>
+                            <p className="text-sm text-muted-foreground">
+                                {selectedDetail.property?.title}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                                Tenant: {selectedDetail.tenantName}
+                            </p>
+                            <p className="mt-2 text-sm">
+                                {selectedDetail.checkInDate} - {selectedDetail.checkOutDate}
+                            </p>
+                        </div>
+                    )}
+
+                    <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                        <div className="flex items-start gap-3">
+                            <Info className="h-5 w-5 text-blue-600" />
+                            <div>
+                                <h4 className="font-semibold text-blue-800">
+                                    Reembolso del depósito
+                                </h4>
+
+                                {!completionResult ? (
+                                    <p className="mt-2 text-sm text-blue-700">
+                                        Si no existen multas por daños, el depósito será reembolsado
+                                        completamente. Si existen multas por daños, el sistema retendrá
+                                        el monto correspondiente.
+                                    </p>
+                                ) : (
+                                    <div className="mt-2 space-y-1 text-sm text-blue-700">
+                                        <div className="flex justify-between">
+                                            <span>Depósito de garantía:</span>
+                                            <span className="font-medium">
+                    ${completionResult.guaranteeDepositAmount.toFixed(2)}
+                  </span>
+                                        </div>
+                                        {(completionResult.retainedAmount > 0 ||
+                                            completionResult.additionalFinePaymentAmount > 0) && (
+                                            <div className="flex justify-between text-red-700">
+                                                <span>Multa por daños:</span>
+                                                <span className="font-medium">
+      $
+                                                    {(
+                                                        completionResult.retainedAmount +
+                                                        completionResult.additionalFinePaymentAmount
+                                                    ).toFixed(2)}
+    </span>
+                                            </div>
+                                        )}
+                                        <div className="flex justify-between">
+                                            <span>Monto retenido:</span>
+                                            <span className="font-medium">
+                    ${completionResult.retainedAmount.toFixed(2)}
+                  </span>
+                                        </div>
+
+                                        <div className="flex justify-between">
+                                            <span>Monto reembolsado:</span>
+                                            <span className="font-medium">
+                    ${completionResult.guaranteeDepositRefundAmount.toFixed(2)}
+                  </span>
+                                        </div>
+
+                                        {completionResult.additionalFinePaymentAmount > 0 && (
+                                            <div className="flex justify-between text-red-700">
+                                                <span>Pago adicional por multa:</span>
+                                                <span className="font-medium">
+                      $
+                                                    {completionResult.additionalFinePaymentAmount.toFixed(2)}
+                    </span>
+                                            </div>
+                                        )}
+
+                                        <div className="mt-2 border-t border-blue-200 pt-2 font-bold">
+                                            Reserva completada correctamente.
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {completionError && (
+                        <p className="text-sm text-destructive">{completionError}</p>
+                    )}
+                </div>
+
+                <DialogFooter>
+                    <Button
+                        variant="outline"
+                        onClick={() => setShowCompleteDialog(false)}
+                    >
+                        {completionResult ? "Cerrar" : "Volver"}
+                    </Button>
+
+                    {!completionResult && (
+                        <Button
+                            disabled={isCompletingReservation}
+                            onClick={handleConfirmCompletion}
+                        >
+                            {isCompletingReservation
+                                ? "Completando..."
+                                : "Confirmar Completar Reserva"}
+                        </Button>
+                    )}
                 </DialogFooter>
             </DialogContent>
         </Dialog>

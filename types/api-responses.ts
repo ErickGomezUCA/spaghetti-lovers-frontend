@@ -164,21 +164,23 @@ export type Property = {
 
 export type ReservationStatus = "PENDING" | "RESERVED" | "ACTIVE" | "COMPLETED" | "CANCELLED";
 
+
 export type ReservationResponse = {
-  id: string;
-  propertyId: string;
-  tenantId: string;
-  checkInDate: string;
-  checkOutDate: string;
-  guestsCount: number;
-  totalNights: number;
-  baseTotal: number;
-  cleaningFee: number;
-  longStayDiscount: number;
-  totalPrice: number;
-  reservationStatus: string;
-  createdAt: string;
-}
+    id: string;
+    propertyId?: string;
+    tenantId?: string;
+    propertyName: string;
+    tenantName: string;
+    tenantEmail: string;
+    checkInDate: string;
+    checkOutDate: string;
+    totalNights: number;
+    guestsCount: number;
+    totalPrice: number;
+    reservationStatus: ReservationStatus;
+    propertyCity: string;
+    propertyDepartment: string;
+};
 
 export type PaginatedResponse<T> = {
   content: T[];
@@ -207,7 +209,7 @@ export type ReservationDetailResponse = {
   securityDepositAmount: number;
   longStayDiscount: number;
   totalPrice: number;
-  reservationStatus: string;
+  reservationStatus: ReservationStatus;
   tenantName: string;
   tenantEmail: string;
   property: {
