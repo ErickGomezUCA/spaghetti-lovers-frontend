@@ -33,10 +33,11 @@ export const propertyService = {
     `/properties/${id}/report?startDate=${startDate}&endDate=${endDate}`
   ),
 
-  getAllPropertiesReport: (startDate: string, endDate: string) =>
-  apiClient.get<ApiResponse<PropertyReportResponse[]>>(
-    `/properties/report?startDate=${startDate}&endDate=${endDate}`
-  ),
+  getAllPropertiesReport: (startDate: string, endDate: string, landlordId?: string) => {
+    const q = new URLSearchParams({ startDate, endDate })
+    if (landlordId) q.set("landlordId", landlordId)
+    return apiClient.get<ApiResponse<PropertyReportResponse[]>>(`/properties/report?${q}`)
+  },
 
   getById: (id: string) =>
     apiClient.get<ApiResponse<Property>>(`/properties/${id}`),
