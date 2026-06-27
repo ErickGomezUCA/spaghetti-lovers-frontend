@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
-import { Star, Home, CalendarDays, User, MessageSquare, ThumbsUp } from 'lucide-react'
+import { Star, Home, CalendarDays, User, MessageSquare, ThumbsUp, Search } from 'lucide-react'
 import { useAuth } from '@/lib/contexts/auth-context'
 import { ratingService } from '@/lib/services/rating.service'
 import { reservationService } from '@/lib/services/reservation.service'
@@ -22,6 +23,7 @@ export default function RatingsPage() {
   const [isLoading, setIsLoading] = useState(true)
 
   const [activeTab, setActiveTab] = useState<'received' | 'given' | 'pending'>('pending')
+  const [searchTerm, setSearchTerm] = useState('')
   const [selectedReservation, setSelectedReservation] = useState<ReservationResponse | null>(null)
   const [rating, setRating] = useState(0)
   const [hoverRating, setHoverRating] = useState(0)
@@ -81,6 +83,14 @@ export default function RatingsPage() {
   const averageScore = ratingsData?.averageScore ?? 0
   const totalRatings = ratingsData?.totalRatings ?? 0
   const ratingsReceived = ratingsData?.ratings ?? []
+
+  const filteredReceived = ratingsReceived.filter((r) =>
+    r.reservationId.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
+  const filteredGiven = ratingsGiven.filter((r) =>
+    r.reservationId.toLowerCase().includes(searchTerm.toLowerCase())
+  )
 
   const renderStars = (score: number, size = 'h-4 w-4') => (
     <div className="flex items-center gap-1">
@@ -153,6 +163,27 @@ export default function RatingsPage() {
         </Button>
       </div>
 
+      {/*Buscador*/}
+      {activeTab !== 'pending' && (
+        <Card className="border-t-4 border-t-primary">
+          <CardContent className="p-4">
+            <div className="relative">
+              <Search
+                className="absolute left-3 top-1/2 -translate-y-1/2
+                w-4 h-4 text-muted-foreground"
+              />
+
+              <Input
+                placeholder="Buscar por reserva..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 bg-input"
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Tab: Recibidas */}
       {activeTab === 'received' && (
         <div className="space-y-4">
@@ -211,12 +242,12 @@ export default function RatingsPage() {
             </Card>
           ) : (
             ratingsGiven.map((ratingItem) => (
-              <Card key={ratingItem.id} className="border-t-4 border-t-green-500">
+              <Card key={ratingItem.id} className="border-t-4 border-t-primary">
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between">
                     <div className="flex items-start gap-4">
-                      <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                        <User className="w-6 h-6 text-green-600" />
+                      <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
+                        <User className="w-6 h-6 text-primary" />
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground">Reserva: {ratingItem.reservationId}</p>
