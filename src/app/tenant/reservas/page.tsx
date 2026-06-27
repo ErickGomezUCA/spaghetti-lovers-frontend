@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -49,7 +50,6 @@ import {
 import { cn } from "@/utils/cn";
 import {format} from "date-fns";
 import { es } from "date-fns/locale";
-
 import { ReservationResponse, ReservationDetailResponse } from "@/types/api-responses";
 
 const statusColors: Record<string, string> = {
@@ -123,6 +123,15 @@ export default function ReservationsPage() {
   const [isCancellingReservation, setIsCancellingReservation] = useState(false);
   const [cancellationError, setCancellationError] = useState<string | null>(null);
 
+  const router = useRouter();
+
+  const handleRateReservation = (
+    reservation: ReservationResponse
+  ) => {
+    router.push(
+      `/tenant/calificaciones?reservationId=${reservation.id}`
+    );
+  };
 
   const fetchReservations = async () => {
     setIsLoading(true);
@@ -366,9 +375,14 @@ export default function ReservationsPage() {
               )}
 
               {reservation.reservationStatus === "COMPLETED" && (
-                <Button variant="outline" size="sm">
-                  <Star className="mr-1 h-4 w-4" /> Calificar
-                </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={ () => handleRateReservation(reservation) }
+                >
+                  <Star className="mr-1 h-4 w-4"/>
+                  Calificar
+              </Button>
               )}
             </div>
           </div>
