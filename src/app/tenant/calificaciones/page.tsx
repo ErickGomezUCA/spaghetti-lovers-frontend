@@ -1,12 +1,14 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
-import { Star, Home, CalendarDays, User, MessageSquare, ThumbsUp } from 'lucide-react'
+import { Star, Home, CalendarDays, User, MessageSquare, ThumbsUp, Search } from 'lucide-react'
 import { useAuth } from '@/lib/contexts/auth-context'
 import { ratingService } from '@/lib/services/rating.service'
 import { reservationService } from '@/lib/services/reservation.service'
@@ -16,12 +18,21 @@ import { ApiError } from '@/lib/exceptions/api-exceptions'
 export default function RatingsPage() {
   const { user } = useAuth()
 
+  const searchParams = useSearchParams()
+
+  const reservationId = searchParams.get("reservationId")
+
+  const highlightedRef = useRef<HTMLDivElement | null>(null)
+
+  const [highlightedReservation, setHighlightedReservation] = useState<string | null>(null)
+
   const [ratingsData, setRatingsData] = useState<UserRatingsResponse | null>(null)
   const [completedReservations, setCompletedReservations] = useState<ReservationResponse[]>([])
   const [ratingsGiven, setRatingsGiven] = useState<RatingResponse[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   const [activeTab, setActiveTab] = useState<'received' | 'given' | 'pending'>('pending')
+  const [searchTerm, setSearchTerm] = useState('')
   const [selectedReservation, setSelectedReservation] = useState<ReservationResponse | null>(null)
   const [rating, setRating] = useState(0)
   const [hoverRating, setHoverRating] = useState(0)
@@ -48,10 +59,50 @@ export default function RatingsPage() {
       setIsLoading(false)
     }
   }
-
   useEffect(() => {
     fetchData()
   }, [user])
+
+  useEffect(() => {
+    if (!reservationId) return
+    if (completedReservations.length === 0)
+      return
+    setActiveTab("pending")
+    const reservation =
+      completedReservations.find(
+        r => r.id === reservationId
+      )
+    if (!reservation) return
+    const alreadyRated =
+      ratingsGiven.some(
+        r => r.reservationId === reservation.id
+      )
+    if (alreadyRated) {
+      setActiveTab("given")
+      setHighlightedReservation(reservation.id)
+      setTimeout(() => {
+        setHighlightedReservation(null)
+      }, 1000)
+      return
+    }
+    setSelectedReservation(
+      reservation
+    )
+    setShowRatingDialog(true)
+  }, [
+    reservationId,
+    completedReservations,
+    ratingsGiven
+  ])
+
+  useEffect(() => {
+    if (highlightedRef.current) {
+      highlightedRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "center"
+      })
+    }
+  }, [activeTab, reservationId])
 
   const pendingReservations = completedReservations.filter(
     (r) => !ratingsGiven.some((rg) => rg.reservationId === r.id)
@@ -81,6 +132,14 @@ export default function RatingsPage() {
   const averageScore = ratingsData?.averageScore ?? 0
   const totalRatings = ratingsData?.totalRatings ?? 0
   const ratingsReceived = ratingsData?.ratings ?? []
+
+  const filteredReceived = ratingsReceived.filter((r) =>
+    r.reservationId.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
+  const filteredGiven = ratingsGiven.filter((r) =>
+    r.reservationId.toLowerCase().includes(searchTerm.toLowerCase())
+  )
 
   const renderStars = (score: number, size = 'h-4 w-4') => (
     <div className="flex items-center gap-1">
@@ -153,6 +212,27 @@ export default function RatingsPage() {
         </Button>
       </div>
 
+      {/*Buscador*/}
+      {activeTab !== 'pending' && (
+        <Card className="border-t-4 border-t-primary">
+          <CardContent className="p-4">
+            <div className="relative">
+              <Search
+                className="absolute left-3 top-1/2 -translate-y-1/2
+                w-4 h-4 text-muted-foreground"
+              />
+
+              <Input
+                placeholder="Buscar por reserva..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 bg-input"
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Tab: Recibidas */}
       {activeTab === 'received' && (
         <div className="space-y-4">
@@ -201,42 +281,66 @@ export default function RatingsPage() {
       {activeTab === 'given' && (
         <div className="space-y-4">
           {isLoading ? (
-            <Card><CardContent className="p-8 text-center text-muted-foreground">Cargando...</CardContent></Card>
+            <Card>
+              <CardContent className="p-8 text-center text-muted-foreground">
+                Cargando...
+              </CardContent>
+            </Card>
           ) : ratingsGiven.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-8">
                 <Star className="mb-3 h-10 w-10 text-muted-foreground/50" />
-                <p className="text-muted-foreground">Aún no has dado calificaciones</p>
+                <p className="text-muted-foreground">
+                  Aún no has dado calificaciones
+                </p>
               </CardContent>
             </Card>
           ) : (
-            ratingsGiven.map((ratingItem) => (
-              <Card key={ratingItem.id} className="border-t-4 border-t-green-500">
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-4">
-                      <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                        <User className="w-6 h-6 text-green-600" />
+            ratingsGiven.map((ratingItem) => {
+              const highlighted =
+                ratingItem.reservationId === highlightedReservation
+              return (
+                <Card
+                  ref={highlighted ? highlightedRef : null}
+                  key={ratingItem.id}
+                  className={
+                    highlighted
+                      ? "bg-muted/50 transition-all duration-300"
+                      : "border-t-4 border-t-primary"
+                  }
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start gap-4">
+                        <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
+                          <User className="w-6 h-6 text-primary" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">
+                            Reserva: {ratingItem.reservationId}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {new Date(
+                              ratingItem.createdAt
+                            ).toLocaleDateString('es-ES')}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Reserva: {ratingItem.reservationId}</p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {new Date(ratingItem.createdAt).toLocaleDateString('es-ES')}
+                      <div className="text-right">
+                        {renderStars(ratingItem.score)}
+                      </div>
+                    </div>
+                    {ratingItem.comment && (
+                      <div className="mt-4 p-3 bg-muted/50 rounded-lg">
+                        <p className="text-sm italic">
+                          &quot;{ratingItem.comment}&quot;
                         </p>
                       </div>
-                    </div>
-                    <div className="text-right">
-                      {renderStars(ratingItem.score)}
-                    </div>
-                  </div>
-                  {ratingItem.comment && (
-                    <div className="mt-4 p-3 bg-muted/50 rounded-lg">
-                      <p className="text-sm italic">&quot;{ratingItem.comment}&quot;</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))
+                    )}
+                  </CardContent>
+                </Card>
+              )
+            })
           )}
         </div>
       )}
@@ -245,47 +349,76 @@ export default function RatingsPage() {
       {activeTab === 'pending' && (
         <div className="space-y-4">
           {isLoading ? (
-            <Card><CardContent className="p-8 text-center text-muted-foreground">Cargando...</CardContent></Card>
+            <Card>
+              <CardContent className="p-8 text-center text-muted-foreground">
+                Cargando...
+              </CardContent>
+            </Card>
           ) : pendingReservations.length === 0 ? (
             <Card className="border-t-4 border-t-primary">
               <CardContent className="p-8 text-center">
                 <ThumbsUp className="w-12 h-12 text-green-500 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold">¡Estás al día!</h3>
-                <p className="text-muted-foreground">No tienes calificaciones pendientes.</p>
+                <h3 className="text-lg font-semibold">
+                  ¡Estás al día!
+                </h3>
+                <p className="text-muted-foreground">
+                  No tienes calificaciones pendientes.
+                </p>
               </CardContent>
             </Card>
           ) : (
-            pendingReservations.map((reservation) => (
-              <Card key={reservation.id}>
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary">
-                        <Home className="h-5 w-5 text-primary" />
+            pendingReservations.map((reservation) => {
+              const highlighted =
+                reservation.id === reservationId
+              return (
+                <Card
+                  ref={highlighted ? highlightedRef : null}
+                  key={reservation.id}
+                  className={
+                    highlighted
+                      ? "border-2 border-primary shadow-md"
+                      : ""
+                  }
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary">
+                          <Home className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <h4 className="font-medium">
+                            Reserva #{reservation.id.slice(0, 8)}
+                          </h4>
+                          <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                            <CalendarDays className="h-3 w-3" />
+                            {new Date(
+                              reservation.checkInDate
+                            ).toLocaleDateString('es-ES')}
+                            {' - '}
+                            {new Date(
+                              reservation.checkOutDate
+                            ).toLocaleDateString('es-ES')}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <h4 className="font-medium">Reserva #{reservation.id.slice(0, 8)}</h4>
-                        <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                          <CalendarDays className="h-3 w-3" />
-                          {new Date(reservation.checkInDate).toLocaleDateString('es-ES')} -{' '}
-                          {new Date(reservation.checkOutDate).toLocaleDateString('es-ES')}
-                        </p>
-                      </div>
+                    
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setSelectedReservation(reservation)
+                          setSubmitError(null)
+                          setShowRatingDialog(true)
+                        }}
+                      >
+                        <Star className="mr-1 h-4 w-4" />
+                        Calificar
+                      </Button>
                     </div>
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        setSelectedReservation(reservation)
-                        setSubmitError(null)
-                        setShowRatingDialog(true)
-                      }}
-                    >
-                      <Star className="mr-1 h-4 w-4" /> Calificar
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
+                  </CardContent>
+                </Card>
+              )
+            })
           )}
         </div>
       )}

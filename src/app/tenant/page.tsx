@@ -13,6 +13,8 @@ import {
     NotificationResponse,
 } from '@/types/api-responses'
 import { notificationService } from '@/lib/services/notification.service'
+import { ratingService } from '@/lib/services/rating.service'
+
 
 const formatShortDate = (dateString: string) => {
   if (!dateString) return "";
@@ -59,29 +61,41 @@ const displayNotificationMessage = (message: string) => {
 
 export default function TenantDashboard() {
   const { user } = useAuth()
-
-    const [reservations, setReservations] = useState<ReservationResponse[]>([])
+  
+  const [reservations, setReservations] = useState<ReservationResponse[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [averageRating, setAverageRating] = useState(0)
+  const [totalRatings, setTotalRatings] = useState(0)
     const [recentNotifications, setRecentNotifications] = useState<NotificationResponse[]>([])
     const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0)
-    const [isLoading, setIsLoading] = useState(true)
+
 
     useEffect(() => {
         const fetchDashboardData = async () => {
+            if (!user) return
+
             setIsLoading(true)
 
             try {
-                const [reservationsRes, notificationsRes, unreadCountRes] =
-                    await Promise.all([
-                        reservationService.getMyReservations(0, 10),
-                        notificationService.getNotifications(false, 0, 3, "createdAt", "desc"),
-                        notificationService.getUnreadCount(),
-                    ])
+                const [
+                    reservationsRes,
+                    notificationsRes,
+                    unreadCountRes,
+                    ratingsRes,
+                ] = await Promise.all([
+                    reservationService.getMyReservations(0, 10),
+                    notificationService.getNotifications(false, 0, 3, "createdAt", "desc"),
+                    notificationService.getUnreadCount(),
+                    ratingService.getByUser(user.id),
+                ])
 
                 setReservations(reservationsRes.data || [])
                 setRecentNotifications(notificationsRes.data || [])
                 setUnreadNotificationsCount(unreadCountRes.data || 0)
+                setAverageRating(ratingsRes.data?.averageScore ?? 0)
+                setTotalRatings(ratingsRes.data?.totalRatings ?? 0)
             } catch (error) {
-                console.error("Error cargando datos del dashboard del inquilino:", error)
+                console.error("Error cargando dashboard:", error)
             } finally {
                 setIsLoading(false)
             }
@@ -101,7 +115,7 @@ export default function TenantDashboard() {
                 handleNotificationsUpdated,
             )
         }
-    }, [])
+    }, [user])
 
   const activeReservations = reservations.filter(
     r => r.reservationStatus === 'ACTIVE' || r.reservationStatus === 'RESERVED'
@@ -162,15 +176,26 @@ export default function TenantDashboard() {
           </CardContent>
         </Card>
 
-        {/* Calificación (Pendiente de conexión) */}
+        {/* Calificación */}
         <Card>
           <CardContent className="flex items-center gap-4 p-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green-100">
-              <Star className="h-6 w-6 text-green-600" />
+              <Star className="h-6 w-6 text-green-600 fill-green-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold">—</p>
-              <p className="text-xs text-muted-foreground">Calificación (Pendiente de conexión)</p>
+              <div className="flex items-center gap-2">
+                <p className="text-2xl font-bold">
+                  {isLoading
+                    ? "—"
+                    : averageRating.toFixed(1)}
+                </p>
+                <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {totalRatings > 0
+                  ? `${totalRatings} calificaciones recibidas`
+                  : "Sin calificaciones"}
+              </p>
             </div>
           </CardContent>
         </Card>
