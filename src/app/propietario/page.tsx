@@ -14,69 +14,103 @@ import {
   Bell,
   Plus,
   ArrowRight,
-  Star,
-  Wrench,
   Loader2,
 } from "lucide-react"
 import { useAuth } from "@/lib/contexts/auth-context"
-
+import { notificationService } from "@/lib/services/notification.service"
 import { reservationService } from "@/lib/services/reservation.service"
-import { ReservationResponse, LandlordReservationSummaryResponse } from "@/types/api-responses"
-
-const pendingActions = [
-  { type: "contract", message: "Contrato pendiente de firma - Casa Playa", priority: "high" },
-  { type: "maintenance", message: "Solicitud de mantenimiento - Apartamento Centro", priority: "medium" },
-  { type: "rating", message: "Calificar inquilino - Reserva #1234", priority: "low" },
-]
-
-const notifications = [
-  { id: "1", message: "Nueva reserva recibida para Casa Playa", time: "Hace 2 horas" },
-  { id: "2", message: "Contrato firmado por inquilino", time: "Hace 5 horas" },
-  { id: "3", message: "Pago de reserva confirmado", time: "Ayer" },
-]
+import { propertyService } from "@/lib/services/property.service"
+import {
+  ReservationResponse,
+  LandlordReservationSummaryResponse,
+  LandlordDashboardStats,
+  NotificationResponse,
+} from "@/types/api-responses"
 
 const formatShortDate = (dateString: string) => {
-  if (!dateString) return "";
-  const [year, month, day] = dateString.split('-');
-  const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-  const monthName = date.toLocaleDateString('es-ES', { month: 'short' });
-  const cleanMonth = monthName.replace('.', '');
-  const capitalizedMonth = cleanMonth.charAt(0).toUpperCase() + cleanMonth.slice(1);
-  return `${day} ${capitalizedMonth}`;
-};
+  if (!dateString) return ""
+  const [year, month, day] = dateString.split("-")
+  const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+  const monthName = date.toLocaleDateString("es-ES", { month: "short" })
+  const cleanMonth = monthName.replace(".", "")
+  const capitalizedMonth = cleanMonth.charAt(0).toUpperCase() + cleanMonth.slice(1)
+  return `${day} ${capitalizedMonth}`
+}
+
+const formatNotificationTime = (dateString: string) => {
+  const date = new Date(dateString)
+  const now = new Date()
+  const diff = now.getTime() - date.getTime()
+  const minutes = Math.floor(diff / (1000 * 60))
+  const hours = Math.floor(minutes / 60)
+  const days = Math.floor(hours / 24)
+
+  if (minutes < 1) return "Hace un momento"
+  if (minutes < 60) return `Hace ${minutes} min`
+  if (hours < 24) return `Hace ${hours} hora${hours > 1 ? "s" : ""}`
+  if (days < 7) return `Hace ${days} día${days > 1 ? "s" : ""}`
+
+  return date.toLocaleDateString("es-ES", { day: "numeric", month: "short" })
+}
+
+const displayTitle = (title: string) => {
+  const translations: Record<string, string> = {
+    "Reservation Cancelled": "Reserva cancelada",
+    "New Reservation": "Nueva reserva recibida",
+  }
+  return translations[title] ?? title
+}
+
+const displayMessage = (message: string) => {
+  const translations: Record<string, string> = {
+    "The reservation has been cancelled.": "La reserva ha sido cancelada.",
+    "You have a new reservation for your property.":
+      "Tienes una nueva reserva para una de tus propiedades.",
+  }
+  return translations[message] ?? message
+}
 
 const getStatusBadgeConfig = (status: string) => {
   switch (status) {
     case "ACTIVE":
-      return { label: "Activa", className: "bg-green-600 hover:bg-green-700 text-white border-transparent" };
+      return { label: "Activa", className: "bg-green-600 hover:bg-green-700 text-white border-transparent" }
     case "CANCELLED":
-      return { label: "Cancelada", className: "bg-red-600 hover:bg-red-700 text-white border-transparent" };
+      return { label: "Cancelada", className: "bg-red-600 hover:bg-red-700 text-white border-transparent" }
     case "COMPLETED":
-      return { label: "Completada", className: "bg-gray-600 hover:bg-gray-700 text-white border-transparent" };
+      return { label: "Completada", className: "bg-gray-600 hover:bg-gray-700 text-white border-transparent" }
     case "RESERVED":
     default:
-      return { label: "Reservada", className: "bg-secondary text-secondary-foreground hover:bg-secondary/80" };
+      return { label: "Reservada", className: "bg-secondary text-secondary-foreground hover:bg-secondary/80" }
   }
-};
+}
 
 export default function LandlordDashboard() {
   const { user } = useAuth()
 
   const [summary, setSummary] = useState<LandlordReservationSummaryResponse | null>(null)
   const [recentReservations, setRecentReservations] = useState<ReservationResponse[]>([])
+  const [recentNotifications, setRecentNotifications] = useState<NotificationResponse[]>([])
+  const [landlordStats, setLandlordStats] = useState<LandlordDashboardStats | null>(null)
+  const [propertiesCount, setPropertiesCount] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     const fetchDashboardData = async () => {
+      if (!user) return
       setIsLoading(true)
       try {
-        const [summaryRes, recentRes] = await Promise.all([
+        const [summaryRes, recentRes, notificationsRes, statsRes, propsRes] = await Promise.all([
           reservationService.getLandlordSummary(),
-          reservationService.getLandlordReservations(0, 3)
+          reservationService.getLandlordReservations(0, 3),
+          notificationService.getNotifications(false, 0, 3, "createdAt", "desc"),
+          propertyService.getLandlordStats(),
+          propertyService.getByLandlord(user.id, 0, 1),
         ])
-        
         setSummary(summaryRes.data)
         setRecentReservations(recentRes.data)
+        setRecentNotifications(notificationsRes.data || [])
+        setLandlordStats(statsRes.data)
+        setPropertiesCount(propsRes.pagination?.totalItems ?? null)
       } catch (error) {
         console.error("Error cargando datos del dashboard:", error)
       } finally {
@@ -85,18 +119,45 @@ export default function LandlordDashboard() {
     }
 
     fetchDashboardData()
-  }, [])
+
+    const handleNotificationsUpdated = () => {
+      fetchDashboardData()
+    }
+
+    window.addEventListener("notifications-updated", handleNotificationsUpdated)
+
+    return () => {
+      window.removeEventListener("notifications-updated", handleNotificationsUpdated)
+    }
+  }, [user])
 
   const stats = [
-    { label: "Propiedades Activas", value: "5", icon: Building2, trend: "+1 este mes" }, // Pendiente conectar a PropertyService
-    { 
-      label: "Reservas Activas", 
-      value: summary ? (summary.active + summary.reserved).toString() : "0", 
-      icon: Calendar, 
-      trend: summary ? `${summary.reserved} pendientes de check-in` : "0 pendientes" 
+    {
+      label: "Propiedades",
+      value: propertiesCount !== null ? propertiesCount.toString() : "—",
+      icon: Building2,
+      trend: "",
     },
-    { label: "Ingresos del Mes", value: "$2,450", icon: DollarSign, trend: "+12% vs mes anterior" }, // Pendiente conectar a PaymentService
-    { label: "Ocupación Promedio", value: "78%", icon: TrendingUp, trend: "+5% este mes" },
+    {
+      label: "Reservas Activas",
+      value: summary ? (summary.active + summary.reserved).toString() : "0",
+      icon: Calendar,
+      trend: summary ? `${summary.reserved} pendientes de check-in` : "0 pendientes",
+    },
+    {
+      label: "Ingresos del Mes",
+      value: landlordStats
+        ? `$${landlordStats.monthlyIncome.toLocaleString("es-CO", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+        : "—",
+      icon: DollarSign,
+      trend: "",
+    },
+    {
+      label: "Ocupación Promedio",
+      value: landlordStats ? `${landlordStats.averageOccupation}%` : "—",
+      icon: TrendingUp,
+      trend: "",
+    },
   ]
 
   return (
@@ -105,7 +166,9 @@ export default function LandlordDashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Panel de Propietario</h1>
-          <p className="text-muted-foreground">Bienvenido de nuevo, {user?.name?.split(' ')[0] || "Propietario"}</p>
+          <p className="text-muted-foreground">
+            Bienvenido de nuevo, {user?.name?.split(" ")[0] || "Propietario"}
+          </p>
         </div>
         <Link href="/propietario/propiedades/nueva">
           <Button className="bg-primary hover:bg-primary/90">
@@ -124,7 +187,11 @@ export default function LandlordDashboard() {
                 <div>
                   <p className="text-sm text-muted-foreground">{stat.label}</p>
                   <p className="text-2xl font-semibold mt-1">
-                    {isLoading && index === 1 ? <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /> : stat.value}
+                    {isLoading ? (
+                      <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                    ) : (
+                      stat.value
+                    )}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">{stat.trend}</p>
                 </div>
@@ -157,12 +224,12 @@ export default function LandlordDashboard() {
           <CardContent>
             <div className="space-y-4">
               {recentReservations.length === 0 && !isLoading && (
-                <p className="text-sm text-muted-foreground text-center py-4">No hay reservas recientes.</p>
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No hay reservas recientes.
+                </p>
               )}
               {recentReservations.map((reservation) => {
-                // Obtenemos la configuración visual del estado
-                const statusConfig = getStatusBadgeConfig(reservation.reservationStatus);
-
+                const statusConfig = getStatusBadgeConfig(reservation.reservationStatus)
                 return (
                   <div
                     key={reservation.id}
@@ -181,17 +248,14 @@ export default function LandlordDashboard() {
                       </div>
                     </div>
                     <div className="text-right flex flex-col items-end">
-                      {/* Fechas formateadas dinámicamente */}
                       <p className="text-xs text-muted-foreground mb-1.5">
-                        {formatShortDate(reservation.checkInDate)} - {formatShortDate(reservation.checkOutDate)}
+                        {formatShortDate(reservation.checkInDate)} -{" "}
+                        {formatShortDate(reservation.checkOutDate)}
                       </p>
-                      {/* Badge con colores y etiquetas dinámicas */}
-                      <Badge className={statusConfig.className}>
-                        {statusConfig.label}
-                      </Badge>
+                      <Badge className={statusConfig.className}>{statusConfig.label}</Badge>
                     </div>
                   </div>
-                );
+                )
               })}
             </div>
           </CardContent>
@@ -209,80 +273,36 @@ export default function LandlordDashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {notifications.map((notification) => (
-                <div
-                  key={notification.id}
-                  className="p-3 bg-muted/50 rounded-lg"
-                >
-                  <p className="text-sm">{notification.message}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{notification.time}</p>
+              {isLoading ? (
+                <div className="flex justify-center py-4">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
                 </div>
-              ))}
+              ) : recentNotifications.length === 0 ? (
+                <p className="py-4 text-center text-sm text-muted-foreground">
+                  No hay notificaciones recientes.
+                </p>
+              ) : (
+                recentNotifications.map((notification) => (
+                  <div
+                    key={notification.id}
+                    className={`rounded-lg p-3 ${notification.isRead ? "bg-muted/50" : "bg-primary/5"}`}
+                  >
+                    <p className="line-clamp-2 text-sm font-medium">
+                      {displayTitle(notification.title)}
+                    </p>
+                    <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
+                      {displayMessage(notification.message)}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {formatNotificationTime(notification.createdAt)}
+                    </p>
+                  </div>
+                ))
+              )}
             </div>
           </CardContent>
         </Card>
       </div>
-
-      {/* Pending Actions */}
-      <Card className="border-t-4 border-t-primary">
-        <CardHeader>
-          <CardTitle className="text-lg font-semibold">Acciones Pendientes</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {pendingActions.map((action, index) => (
-              <div
-                key={index}
-                className="flex items-start gap-3 p-4 bg-muted/50 rounded-lg"
-              >
-                <div className={`p-2 rounded-lg ${
-                  action.priority === "high" ? "bg-red-100 text-red-600" :
-                  action.priority === "medium" ? "bg-yellow-100 text-yellow-600" :
-                  "bg-blue-100 text-blue-600"
-                }`}>
-                  {action.type === "contract" && <FileText className="w-4 h-4" />}
-                  {action.type === "maintenance" && <Wrench className="w-4 h-4" />}
-                  {action.type === "rating" && <Star className="w-4 h-4" />}
-                </div>
-                <div>
-                  <p className="text-sm font-medium">{action.message}</p>
-                  <Badge variant="outline" className={`mt-2 text-xs ${
-                    action.priority === "high" ? "border-red-500 text-red-600" :
-                    action.priority === "medium" ? "border-yellow-500 text-yellow-600" :
-                    "border-blue-500 text-blue-600"
-                  }`}>
-                    {action.priority === "high" ? "Alta prioridad" :
-                     action.priority === "medium" ? "Media prioridad" : "Baja prioridad"}
-                  </Badge>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
     </div>
-  )
-}
-
-function FileText(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-      <polyline points="14 2 14 8 20 8" />
-      <line x1="16" x2="8" y1="13" y2="13" />
-      <line x1="16" x2="8" y1="17" y2="17" />
-      <line x1="10" x2="8" y1="9" y2="9" />
-    </svg>
   )
 }

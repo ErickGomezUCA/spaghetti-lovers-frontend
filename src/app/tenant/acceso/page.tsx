@@ -24,6 +24,10 @@ export default function AccessCodesPage() {
     const [accessCodes, setAccessCodes] = useState<AccessCodeDetailResponse[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [codeError, setCodeError] = useState<string | null>(null)
+    const [page, setPage] = useState(0)
+    const [totalPages, setTotalPages] = useState(1)
+
+    const pageSize = 4
 
     useEffect(() => {
         const loadAccessCodes = async () => {
@@ -31,8 +35,15 @@ export default function AccessCodesPage() {
             setCodeError(null)
 
             try {
-                const response = await accessCodeService.getTenantAccessCodes()
-                setAccessCodes(response.data)
+                const response = await accessCodeService.getTenantAccessCodes(
+                    page,
+                    pageSize,
+                    "validFrom",
+                    "desc",
+                )
+
+                setAccessCodes(response.data || [])
+                setTotalPages(response.pagination?.totalPages || 1)
             } catch (error) {
                 console.error('Error loading tenant access codes:', error)
                 setCodeError('No se pudieron cargar los códigos de acceso.')
@@ -42,7 +53,7 @@ export default function AccessCodesPage() {
         }
 
         loadAccessCodes()
-    }, [])
+    }, [page])
 
     const handleCopyCode = (code: string) => {
         navigator.clipboard.writeText(code)
@@ -259,6 +270,31 @@ export default function AccessCodesPage() {
                     })
                 )}
             </div>
+            {totalPages > 1 && (
+                <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">
+                        Página {page + 1} de {totalPages}
+                    </p>
+
+                    <div className="flex gap-2">
+                        <Button
+                            variant="outline"
+                            disabled={page === 0 || isLoading}
+                            onClick={() => setPage((prev) => Math.max(prev - 1, 0))}
+                        >
+                            Anterior
+                        </Button>
+
+                        <Button
+                            variant="outline"
+                            disabled={page + 1 >= totalPages || isLoading}
+                            onClick={() => setPage((prev) => prev + 1)}
+                        >
+                            Siguiente
+                        </Button>
+                    </div>
+                </div>
+            )}
 
             {/* Instructions Card */}
             <Card>

@@ -1,5 +1,12 @@
 import { apiClient } from "@/lib/clients/api-client";
-import { ApiResponse, AppUser, Auth, UserProfileResponse, UserRatingsResponse } from "@/types/api-responses";
+import {
+  ApiResponse,
+  AppUser,
+  Auth,
+  UserProfileResponse,
+  UserRatingsResponse,
+  UserResponse,
+} from "@/types/api-responses";
 import {
   ChangePasswordRequest,
   RegisterRequest,
@@ -27,9 +34,23 @@ export const userService = {
   getProfile: () =>
     apiClient.get<ApiResponse<UserProfileResponse>>("/users/profile"),
 
+  getAllUsers: (params?: { page?: number; pageSize?: number; role?: string; search?: string }) => {
+    const { page = 0, pageSize = 10, role, search } = params ?? {};
+    const query = new URLSearchParams({ page: String(page), pageSize: String(pageSize), sortBy: "createdAt", sortOrder: "desc" });
+    if (role && role !== "all") query.set("role", role);
+    if (search) query.set("search", search);
+    return apiClient.get<ApiResponse<UserProfileResponse[]>>(`/users/all?${query}`);
+  },
+
+  getUserProfileById: (userId: string) =>
+    apiClient.get<ApiResponse<UserProfileResponse>>(`/users/${userId}/profile`),
+
   getUserById: (userId: string) =>
     apiClient.get<ApiResponse<AppUser>>(`/users/${userId}`),
 
   getRating: (userId: string) =>
     apiClient.get<ApiResponse<UserRatingsResponse>>(`/users/${userId}/rating`),
+
+  getLandlords: () =>
+    apiClient.get<ApiResponse<UserResponse[]>>("/users/landlords"),
 };
