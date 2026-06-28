@@ -5,6 +5,7 @@ import {
   Auth,
   UserProfileResponse,
   UserRatingsResponse,
+  UserResponse,
 } from "@/types/api-responses";
 import {
   ChangePasswordRequest,
@@ -49,4 +50,7 @@ export const userService = {
 
   getRating: (userId: string) =>
     apiClient.get<ApiResponse<UserRatingsResponse>>(`/users/${userId}/rating`),
+
+  getLandlords: () =>
+    apiClient.get<ApiResponse<UserResponse[]>>("/users/landlords"),
 };

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { notificationService } from "@/lib/services/notification.service";
 import {
   Users,
   Building2,
@@ -57,6 +58,16 @@ export default function AdminDashboard() {
   const [activeProperties, setActiveProperties] = useState<number | null>(null);
   const [monthly, setMonthly] = useState<AdminMonthlySummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+
+  const fetchUnreadNotificationsCount = async () => {
+    try {
+      const response = await notificationService.getUnreadCount();
+      setUnreadNotificationsCount(response.data || 0);
+    } catch (error) {
+      console.error("Error cargando contador de notificaciones admin:", error);
+    }
+  };
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -79,8 +90,7 @@ export default function AdminDashboard() {
         setTenantCount(tenants);
         setActiveProperties(activePropCount);
 
-        const monthlyRes =
-          await adminService.getMonthlySummary(activePropCount);
+        const monthlyRes = await adminService.getMonthlySummary(activePropCount);
         setMonthly(monthlyRes.data);
       } catch (error) {
         console.error("Error cargando stats del admin:", error);
@@ -89,6 +99,13 @@ export default function AdminDashboard() {
       }
     };
     fetchStats();
+  }, []);
+
+  useEffect(() => {
+    fetchUnreadNotificationsCount();
+    const handleNotificationsUpdated = () => { fetchUnreadNotificationsCount(); };
+    window.addEventListener("notifications-updated", handleNotificationsUpdated);
+    return () => { window.removeEventListener("notifications-updated", handleNotificationsUpdated); };
   }, []);
 
   const statCards = [
@@ -159,6 +176,11 @@ export default function AdminDashboard() {
             <Link href="/admin/notificaciones">
               <Button variant="outline" size="icon" className="relative">
                 <Bell className="w-5 h-5" />
+                {unreadNotificationsCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">
+                    {unreadNotificationsCount}
+                  </span>
+                )}
               </Button>
             </Link>
           </div>

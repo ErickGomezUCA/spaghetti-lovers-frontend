@@ -25,6 +25,7 @@ import {
   Wrench,
   Clock,
 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/contexts/auth-context";
 import { propertyService } from "@/lib/services/property.service";
 import { Property } from "@/types/api-responses";
@@ -65,19 +66,18 @@ export default function CalendarPage() {
   const [showAllEvents, setShowAllEvents] = useState(false);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
 
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const propertyId = searchParams.get("propertyId");
+    if (propertyId) {
+      setSelectedPropertyId(propertyId);
+    }
+  }, [searchParams]);
+
   const monthNames = [
-    "Enero",
-    "Febrero",
-    "Marzo",
-    "Abril",
-    "Mayo",
-    "Junio",
-    "Julio",
-    "Agosto",
-    "Septiembre",
-    "Octubre",
-    "Noviembre",
-    "Diciembre",
+    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
   ];
   const dayNames = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 

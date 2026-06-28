@@ -7,7 +7,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { reservationService } from "@/lib/services/reservation.service";
-import { ReservationCancellationPreviewResponse } from "@/types/api-responses";
+import { accessCodeService } from "@/lib/services/access-code.service";
+import {
+    ReservationCancellationPreviewResponse,
+    ReservationResponse,
+    ReservationDetailResponse,
+    AccessCodeDetailResponse,
+} from "@/types/api-responses";
 import {
   Dialog,
   DialogContent,
@@ -50,7 +56,7 @@ import {
 import { cn } from "@/utils/cn";
 import {format} from "date-fns";
 import { es } from "date-fns/locale";
-import { ReservationResponse, ReservationDetailResponse } from "@/types/api-responses";
+
 
 const statusColors: Record<string, string> = {
   RESERVED: "bg-blue-100 text-blue-800",
@@ -100,6 +106,7 @@ const formatFullLongDate = (dateString: string) => {
 
 export default function ReservationsPage() {
   const [reservations, setReservations] = useState<ReservationResponse[]>([]);
+  const [accessCodes, setAccessCodes] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
 
   const [selectedReservation, setSelectedReservation] = useState<ReservationResponse | null>(null);
@@ -134,16 +141,35 @@ export default function ReservationsPage() {
   };
 
   const fetchReservations = async () => {
-    setIsLoading(true);
-    try {
-      const res = await reservationService.getMyReservations(0, 50);
-      setReservations(res.data || []);
-    } catch (error) {
-      console.error("Error cargando reservas:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+        setIsLoading(true);
+
+        try {
+            const [reservationsRes, accessCodesRes] = await Promise.all([
+                reservationService.getMyReservations(0, 50),
+                accessCodeService.getTenantAccessCodes(),
+            ]);
+
+            const reservationsData = reservationsRes.data || [];
+            const accessCodesData: AccessCodeDetailResponse[] =
+                accessCodesRes.data || [];
+
+            setReservations(reservationsData);
+
+            const accessCodeMap = accessCodesData.reduce<Record<string, string>>(
+                (acc, accessCode) => {
+                    acc[accessCode.reservationId] = accessCode.code;
+                    return acc;
+                },
+                {},
+            );
+
+            setAccessCodes(accessCodeMap);
+        } catch (error) {
+            console.error("Error cargando reservas:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
   useEffect(() => {
     fetchReservations();
@@ -352,10 +378,11 @@ export default function ReservationsPage() {
               {(reservation.reservationStatus === "ACTIVE" || reservation.reservationStatus === "RESERVED") && (
                 <>
                   <Button variant="outline" size="sm" className="bg-muted/30">
-                    <Key className="mr-1 h-4 w-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Pendiente</span>
-                  </Button>
-
+                  <Key className="mr-1 h-4 w-4 text-muted-foreground" />
+                  <span className="font-mono text-muted-foreground">
+                    {accessCodes[reservation.id] || "Pendiente"}
+                  </span>
+                </Button>
                   <Button
                     variant="outline"
                     size="sm"
@@ -563,8 +590,10 @@ export default function ReservationsPage() {
                     Código de Acceso
                   </p>
                   <p className="font-mono text-sm font-bold text-[#E46B4B]">
-                    Pendiente de conexión
-                  </p>
+                      {selectedReservation
+                          ? accessCodes[selectedReservation.id] || "Pendiente"
+                          : "Pendiente"}
+                </p>
                 </div>
               </div>
             </div>

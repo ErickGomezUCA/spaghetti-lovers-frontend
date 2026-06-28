@@ -68,13 +68,30 @@ const displayMessage = (message: string) => {
 export default function NotificationsPage() {
     const [notifications, setNotifications] = useState<NotificationResponse[]>([])
     const [isLoading, setIsLoading] = useState(true)
+    const [activeTab, setActiveTab] = useState<"unread" | "all">("unread")
+    const [page, setPage] = useState(0)
+    const [totalPages, setTotalPages] = useState(1)
+    const [unreadCount, setUnreadCount] = useState(0)
 
-    const fetchNotifications = async () => {
+    const pageSize = 10
+
+    const fetchNotifications = async (
+        currentPage = page,
+        currentTab = activeTab,
+    ) => {
         setIsLoading(true)
 
         try {
-            const response = await notificationService.getNotifications()
-            setNotifications(response.data)
+            const response = await notificationService.getNotifications(
+                currentTab === "unread",
+                currentPage,
+                pageSize,
+                "createdAt",
+                "desc",
+            )
+
+            setNotifications(response.data || [])
+            setTotalPages(response.pagination?.totalPages || 1)
         } catch (error) {
             console.error("Error loading notifications:", error)
         } finally {
@@ -82,60 +99,59 @@ export default function NotificationsPage() {
         }
     }
 
-    useEffect(() => {
-        fetchNotifications()
-    }, [])
+    const fetchUnreadCount = async () => {
+        try {
+            const response = await notificationService.getUnreadCount()
+            setUnreadCount(response.data || 0)
+        } catch (error) {
+            console.error("Error loading unread notifications count:", error)
+        }
+    }
 
-    const unreadNotifications = notifications.filter(
-        (notification) => !notification.isRead,
-    )
+    useEffect(() => {
+        fetchNotifications(page, activeTab)
+        fetchUnreadCount()
+    }, [page, activeTab])
 
     const markAsRead = async (notificationId: string) => {
         try {
-            const response = await notificationService.markAsRead(notificationId);
+            await notificationService.markAsRead(notificationId)
 
-            setNotifications((prev) =>
-                prev.map((notification) =>
-                    notification.id === notificationId ? response.data : notification,
-                ),
-            );
-
-            window.dispatchEvent(new Event("notifications-updated"));
+            window.dispatchEvent(new Event("notifications-updated"))
+            fetchNotifications(page, activeTab)
+            fetchUnreadCount()
         } catch (error) {
-            console.error("Error marking notification as read:", error);
+            console.error("Error marking notification as read:", error)
         }
-    };
+    }
 
     const markAllAsRead = async () => {
         try {
-            await notificationService.markAllAsRead();
+            await notificationService.markAllAsRead()
 
-            setNotifications((prev) =>
-                prev.map((notification) => ({
-                    ...notification,
-                    isRead: true,
-                })),
-            );
-
-            window.dispatchEvent(new Event("notifications-updated"));
+            window.dispatchEvent(new Event("notifications-updated"))
+            setPage(0)
+            fetchNotifications(0, activeTab)
+            fetchUnreadCount()
         } catch (error) {
-            console.error("Error marking all notifications as read:", error);
+            console.error("Error marking all notifications as read:", error)
         }
-    };
+    }
 
     const deleteNotification = async (notificationId: string) => {
         try {
-            await notificationService.deleteNotification(notificationId);
+            await notificationService.deleteNotification(notificationId)
 
-            setNotifications((prev) =>
-                prev.filter((notification) => notification.id !== notificationId),
-            );
+            const nextPage = notifications.length === 1 && page > 0 ? page - 1 : page
 
-            window.dispatchEvent(new Event("notifications-updated"));
+            window.dispatchEvent(new Event("notifications-updated"))
+            setPage(nextPage)
+            fetchNotifications(nextPage, activeTab)
+            fetchUnreadCount()
         } catch (error) {
-            console.error("Error deleting notification:", error);
+            console.error("Error deleting notification:", error)
         }
-    };
+    }
 
     const formatDate = (dateString: string) => {
         const date = new Date(dateString)
@@ -239,15 +255,15 @@ export default function NotificationsPage() {
                     </h1>
 
                     <p className="text-muted-foreground">
-                        {unreadNotifications.length > 0
-                            ? `Tienes ${unreadNotifications.length} notificación${
-                                unreadNotifications.length > 1 ? "es" : ""
+                        {unreadCount > 0
+                            ? `Tienes ${unreadCount} notificación${
+                                unreadCount > 1 ? "es" : ""
                             } sin leer`
                             : "Todas las notificaciones están leídas"}
                     </p>
                 </div>
 
-                {unreadNotifications.length > 0 && (
+                {unreadCount > 0 && (
                     <Button variant="outline" onClick={markAllAsRead}>
                         <CheckCircle2 className="mr-1 h-4 w-4" />
                         Marcar todas como leídas
@@ -255,14 +271,21 @@ export default function NotificationsPage() {
                 )}
             </div>
 
-            <Tabs defaultValue="unread" className="w-full">
+            <Tabs
+                value={activeTab}
+                onValueChange={(value) => {
+                    setPage(0)
+                    setActiveTab(value as "unread" | "all")
+                }}
+                className="w-full"
+            >
                 <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="unread">
-                        Sin Leer ({unreadNotifications.length})
+                        Sin Leer ({unreadCount})
                     </TabsTrigger>
 
                     <TabsTrigger value="all">
-                        Todas ({notifications.length})
+                        Todas
                     </TabsTrigger>
                 </TabsList>
 
@@ -273,7 +296,7 @@ export default function NotificationsPage() {
                                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
                             </CardContent>
                         </Card>
-                    ) : unreadNotifications.length === 0 ? (
+                    ) : notifications.length === 0 ? (
                         <Card>
                             <CardContent className="flex flex-col items-center justify-center py-12">
                                 <BellOff className="mb-4 h-12 w-12 text-muted-foreground/50" />
@@ -284,7 +307,7 @@ export default function NotificationsPage() {
                             </CardContent>
                         </Card>
                     ) : (
-                        unreadNotifications.map((notification) => (
+                        notifications.map((notification) => (
                             <NotificationCard
                                 key={notification.id}
                                 notification={notification}
@@ -320,6 +343,31 @@ export default function NotificationsPage() {
                     )}
                 </TabsContent>
             </Tabs>
+            {totalPages > 1 && (
+                <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">
+                        Página {page + 1} de {totalPages}
+                    </p>
+
+                    <div className="flex gap-2">
+                        <Button
+                            variant="outline"
+                            disabled={page === 0 || isLoading}
+                            onClick={() => setPage((prev) => Math.max(prev - 1, 0))}
+                        >
+                            Anterior
+                        </Button>
+
+                        <Button
+                            variant="outline"
+                            disabled={page + 1 >= totalPages || isLoading}
+                            onClick={() => setPage((prev) => prev + 1)}
+                        >
+                            Siguiente
+                        </Button>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

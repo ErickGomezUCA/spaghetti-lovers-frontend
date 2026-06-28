@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/clients/api-client";
-import { ApiResponse, AvailabilityResponse, LandlordCalendarResponse, LandlordDashboardStats, Property } from "@/types/api-responses";
+import { ApiResponse, AvailabilityResponse, LandlordCalendarResponse, LandlordDashboardStats, Property, PropertyReportResponse } from "@/types/api-responses";
 import {
   AttachPhotoRequest,
   CreatePropertyRequest,
@@ -27,6 +27,17 @@ export const propertyService = {
   apiClient.get<ApiResponse<AvailabilityResponse>>(
     `/properties/${id}/availability?startDate=${startDate}&endDate=${endDate}`
   ),
+
+  getReport: (id: string, startDate: string, endDate: string) =>
+  apiClient.get<ApiResponse<PropertyReportResponse>>(
+    `/properties/${id}/report?startDate=${startDate}&endDate=${endDate}`
+  ),
+
+  getAllPropertiesReport: (startDate: string, endDate: string, landlordId?: string) => {
+    const q = new URLSearchParams({ startDate, endDate })
+    if (landlordId) q.set("landlordId", landlordId)
+    return apiClient.get<ApiResponse<PropertyReportResponse[]>>(`/properties/report?${q}`)
+  },
 
   getById: (id: string) =>
     apiClient.get<ApiResponse<Property>>(`/properties/${id}`),

@@ -68,13 +68,25 @@ export default function NotificationsPage() {
     const [filter, setFilter] = useState("all")
     const [notifications, setNotifications] = useState<NotificationResponse[]>([])
     const [isLoading, setIsLoading] = useState(true)
+    const [page, setPage] = useState(0)
+    const [totalPages, setTotalPages] = useState(1)
+    const [unreadCount, setUnreadCount] = useState(0)
+    const pageSize = 10
 
-    const fetchNotifications = async () => {
+    const fetchNotifications = async (currentPage = page, currentFilter = filter) => {
         setIsLoading(true)
 
         try {
-            const response = await notificationService.getNotifications()
-            setNotifications(response.data)
+            const response = await notificationService.getNotifications(
+                currentFilter === "unread",
+                currentPage,
+                pageSize,
+                "createdAt",
+                "desc",
+            )
+
+            setNotifications(response.data || [])
+            setTotalPages(response.pagination?.totalPages || 1)
         } catch (error) {
             console.error("Error loading notifications:", error)
         } finally {
@@ -82,31 +94,34 @@ export default function NotificationsPage() {
         }
     }
 
+    const fetchUnreadCount = async () => {
+        try {
+            const response = await notificationService.getUnreadCount()
+            setUnreadCount(response.data || 0)
+        } catch (error) {
+            console.error("Error loading unread notifications count:", error)
+        }
+    }
+
     useEffect(() => {
-        fetchNotifications()
-    }, [])
+        fetchNotifications(page, filter)
+        fetchUnreadCount()
+    }, [page, filter])
 
     const filteredNotifications = notifications.filter((notification) => {
-        if (filter === "all") return true
-        if (filter === "unread") return !notification.isRead
-        return notification.type === filter
+        if (filter === "INFO") return notification.type === "INFO"
+        if (filter === "REMINDER") return notification.type === "REMINDER"
+        if (filter === "MAINTENANCE") return notification.type === "MAINTENANCE"
+        return true
     })
-
-    const unreadCount = notifications.filter(
-        (notification) => !notification.isRead,
-    ).length
 
     const markAsRead = async (notificationId: string) => {
         try {
-            const response = await notificationService.markAsRead(notificationId)
+            await notificationService.markAsRead(notificationId)
 
-            setNotifications((prev) =>
-                prev.map((notification) =>
-                    notification.id === notificationId
-                        ? response.data
-                        : notification,
-                ),
-            )
+            window.dispatchEvent(new Event("notifications-updated"))
+            fetchNotifications(page, filter)
+            fetchUnreadCount()
         } catch (error) {
             console.error("Error marking notification as read:", error)
         }
@@ -116,12 +131,10 @@ export default function NotificationsPage() {
         try {
             await notificationService.markAllAsRead()
 
-            setNotifications((prev) =>
-                prev.map((notification) => ({
-                    ...notification,
-                    isRead: true,
-                })),
-            )
+            window.dispatchEvent(new Event("notifications-updated"))
+            setPage(0)
+            fetchNotifications(0, filter)
+            fetchUnreadCount()
         } catch (error) {
             console.error("Error marking all notifications as read:", error)
         }
@@ -131,9 +144,12 @@ export default function NotificationsPage() {
         try {
             await notificationService.deleteNotification(notificationId)
 
-            setNotifications((prev) =>
-                prev.filter((notification) => notification.id !== notificationId),
-            )
+            const nextPage = notifications.length === 1 && page > 0 ? page - 1 : page
+
+            window.dispatchEvent(new Event("notifications-updated"))
+            setPage(nextPage)
+            fetchNotifications(nextPage, filter)
+            fetchUnreadCount()
         } catch (error) {
             console.error("Error deleting notification:", error)
         }
@@ -183,7 +199,13 @@ export default function NotificationsPage() {
 
             <Card className="border-t-4 border-t-primary">
                 <CardContent className="p-4">
-                    <Select value={filter} onValueChange={setFilter}>
+                    <Select
+                        value={filter}
+                        onValueChange={(value) => {
+                        setPage(0)
+                        setFilter(value)
+                    }}
+                        >
                         <SelectTrigger className="w-full bg-input md:w-56">
                             <SelectValue placeholder="Filtrar por tipo" />
                         </SelectTrigger>
@@ -299,6 +321,31 @@ export default function NotificationsPage() {
                     ))
                 )}
             </div>
+            {totalPages > 1 && (
+                <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">
+                        Página {page + 1} de {totalPages}
+                    </p>
+
+                    <div className="flex gap-2">
+                        <Button
+                            variant="outline"
+                            disabled={page === 0 || isLoading}
+                            onClick={() => setPage((prev) => Math.max(prev - 1, 0))}
+                        >
+                            Anterior
+                        </Button>
+
+                        <Button
+                            variant="outline"
+                            disabled={page + 1 >= totalPages || isLoading}
+                            onClick={() => setPage((prev) => prev + 1)}
+                        >
+                            Siguiente
+                        </Button>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
