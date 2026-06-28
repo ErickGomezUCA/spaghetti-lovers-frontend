@@ -7,6 +7,7 @@ import {
   ReservationExtensionResponse,
   ReservationCancellationPreviewResponse,
   ReservationCancellationResponse,
+  ReservationCompletionResponse,
 } from "@/types/api-responses"
 
 export const reservationService = {
@@ -108,4 +109,12 @@ getAllReservations: (
       `/reservations/admin/all?${params.toString()}`
     );
   },
+
+    completeReservation: (
+        reservationId: string,
+    ): Promise<ApiResponse<ReservationCompletionResponse>> =>
+        apiClient.post<ApiResponse<ReservationCompletionResponse>>(
+            `/reservations/${reservationId}/complete`,
+            {},
+        ),
 };

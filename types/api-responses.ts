@@ -164,8 +164,11 @@ export type Property = {
 
 export type ReservationStatus = "PENDING" | "RESERVED" | "ACTIVE" | "COMPLETED" | "CANCELLED";
 
+
 export type ReservationResponse = {
   id: string;
+  propertyId?: string;
+  tenantId?: string;
   propertyName: string;
   tenantName: string;
   tenantEmail: string;
@@ -207,7 +210,7 @@ export type ReservationDetailResponse = {
   securityDepositAmount: number;
   longStayDiscount: number;
   totalPrice: number;
-  reservationStatus: string;
+  reservationStatus: ReservationStatus;
   tenantName: string;
   tenantEmail: string;
   property: {
@@ -308,6 +311,53 @@ export type NotificationResponse = {
     createdAt: string
 }
 
+export type BlockType = 'RESERVATION' | 'MAINTENANCE' | 'PREVENTIVE_MAINTENANCE'
 
+export type ConflictResponse = {
+  id: string
+  blockType: BlockType
+  timestampStart: string
+  timestampEnd: string
+  blockedReason: string | null
+}
 
+export type AvailabilityResponse = {
+  available: boolean
+  conflicts: ConflictResponse[]
+}
 
+export type ReservationCompletionResponse = {
+    reservationId: string
+    reservationStatus: ReservationStatus
+    guaranteeDepositAmount: number
+    retainedAmount: number
+    guaranteeDepositRefundAmount: number
+    additionalFinePaymentAmount: number
+    completedAt: string
+}
+
+export type PropertyReportResponse = {
+  propertyId: string
+  propertyTitle: string
+  period: {
+    start: string
+    end: string
+  }
+  occupancyRate: number
+  totalNightsOccupied: number
+  totalReservations: number
+  revenue: {
+    base: number
+    cleaning: number
+    penalties: number
+    total: number
+  }
+}
+
+export type UserResponse = {
+  id: string
+  name: string
+  email: string
+  phone?: string
+  role: string
+}
