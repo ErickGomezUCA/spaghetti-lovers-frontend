@@ -17,7 +17,7 @@ export function AdminSidebar() {
 
   return (
     <div className="w-64">
-      <aside className="flex flex-col w-64 min-h-screen bg-card border-r border-border fixed">
+      <aside className="flex flex-col w-64 h-screen bg-card border-r border-border fixed top-0 left-0 overflow-y-auto">
         {/* Logo */}
         <div className="flex items-center gap-3 px-6 py-5 border-b border-border">
           <div className="flex items-center justify-center w-10 h-10 rounded-lg border border-border bg-background">
