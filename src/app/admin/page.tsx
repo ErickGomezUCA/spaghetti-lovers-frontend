@@ -1,6 +1,8 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { notificationService } from "@/lib/services/notification.service"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import {
@@ -60,6 +62,34 @@ const colorClasses: Record<string, { bg: string; text: string; iconBg: string }>
 }
 
 export default function AdminDashboard() {
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0)
+
+    const fetchUnreadNotificationsCount = async () => {
+        try {
+            const response = await notificationService.getUnreadCount()
+            setUnreadNotificationsCount(response.data || 0)
+        } catch (error) {
+            console.error("Error cargando contador de notificaciones admin:", error)
+        }
+    }
+
+    useEffect(() => {
+        fetchUnreadNotificationsCount()
+
+        const handleNotificationsUpdated = () => {
+            fetchUnreadNotificationsCount()
+        }
+
+        window.addEventListener("notifications-updated", handleNotificationsUpdated)
+
+        return () => {
+            window.removeEventListener(
+                "notifications-updated",
+                handleNotificationsUpdated,
+            )
+        }
+    }, [])
+
   return (
     <div className="space-y-8">
       {/* Welcome Header */}
@@ -71,12 +101,15 @@ export default function AdminDashboard() {
               <p className="text-muted-foreground mt-1">Aquí tienes un resumen del sistema RentFlow</p>
             </div>
             <Link href="/admin/notificaciones">
-              <Button variant="outline" size="icon" className="relative">
-                <Bell className="w-5 h-5" />
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary text-primary-foreground text-xs rounded-full flex items-center justify-center">
-                  5
-                </span>
-              </Button>
+                <Button variant="outline" size="icon" className="relative">
+                    <Bell className="w-5 h-5" />
+
+                    {unreadNotificationsCount > 0 && (
+                        <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">
+        {unreadNotificationsCount}
+      </span>
+                    )}
+                </Button>
             </Link>
           </div>
         </CardContent>

@@ -20,8 +20,13 @@ import {
 } from "lucide-react"
 import { useAuth } from "@/lib/contexts/auth-context"
 
+import { notificationService } from "@/lib/services/notification.service"
 import { reservationService } from "@/lib/services/reservation.service"
-import { ReservationResponse, LandlordReservationSummaryResponse } from "@/types/api-responses"
+import {
+    ReservationResponse,
+    LandlordReservationSummaryResponse,
+    NotificationResponse,
+} from "@/types/api-responses"
 
 const pendingActions = [
   { type: "contract", message: "Contrato pendiente de firma - Casa Playa", priority: "high" },
@@ -45,6 +50,44 @@ const formatShortDate = (dateString: string) => {
   return `${day} ${capitalizedMonth}`;
 };
 
+const formatNotificationTime = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diff = now.getTime() - date.getTime()
+    const minutes = Math.floor(diff / (1000 * 60))
+    const hours = Math.floor(minutes / 60)
+    const days = Math.floor(hours / 24)
+
+    if (minutes < 1) return "Hace un momento"
+    if (minutes < 60) return `Hace ${minutes} min`
+    if (hours < 24) return `Hace ${hours} hora${hours > 1 ? "s" : ""}`
+    if (days < 7) return `Hace ${days} día${days > 1 ? "s" : ""}`
+
+    return date.toLocaleDateString("es-ES", {
+        day: "numeric",
+        month: "short",
+    })
+}
+
+const displayTitle = (title: string) => {
+    const translations: Record<string, string> = {
+        "Reservation Cancelled": "Reserva cancelada",
+        "New Reservation": "Nueva reserva recibida",
+    }
+
+    return translations[title] ?? title
+}
+
+const displayMessage = (message: string) => {
+    const translations: Record<string, string> = {
+        "The reservation has been cancelled.": "La reserva ha sido cancelada.",
+        "You have a new reservation for your property.":
+            "Tienes una nueva reserva para una de tus propiedades.",
+    }
+
+    return translations[message] ?? message
+}
+
 const getStatusBadgeConfig = (status: string) => {
   switch (status) {
     case "ACTIVE":
@@ -62,30 +105,47 @@ const getStatusBadgeConfig = (status: string) => {
 export default function LandlordDashboard() {
   const { user } = useAuth()
 
-  const [summary, setSummary] = useState<LandlordReservationSummaryResponse | null>(null)
-  const [recentReservations, setRecentReservations] = useState<ReservationResponse[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+    const [summary, setSummary] = useState<LandlordReservationSummaryResponse | null>(null)
+    const [recentReservations, setRecentReservations] = useState<ReservationResponse[]>([])
+    const [recentNotifications, setRecentNotifications] = useState<NotificationResponse[]>([])
+    const [isLoading, setIsLoading] = useState(true)
 
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      setIsLoading(true)
-      try {
-        const [summaryRes, recentRes] = await Promise.all([
-          reservationService.getLandlordSummary(),
-          reservationService.getLandlordReservations(0, 3)
-        ])
-        
-        setSummary(summaryRes.data)
-        setRecentReservations(recentRes.data)
-      } catch (error) {
-        console.error("Error cargando datos del dashboard:", error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
+    useEffect(() => {
+        const fetchDashboardData = async () => {
+            setIsLoading(true)
 
-    fetchDashboardData()
-  }, [])
+            try {
+                const [summaryRes, recentRes, notificationsRes] = await Promise.all([
+                    reservationService.getLandlordSummary(),
+                    reservationService.getLandlordReservations(0, 3),
+                    notificationService.getNotifications(false, 0, 3, "createdAt", "desc"),
+                ])
+
+                setSummary(summaryRes.data)
+                setRecentReservations(recentRes.data)
+                setRecentNotifications(notificationsRes.data || [])
+            } catch (error) {
+                console.error("Error cargando datos del dashboard:", error)
+            } finally {
+                setIsLoading(false)
+            }
+        }
+
+        fetchDashboardData()
+
+        const handleNotificationsUpdated = () => {
+            fetchDashboardData()
+        }
+
+        window.addEventListener("notifications-updated", handleNotificationsUpdated)
+
+        return () => {
+            window.removeEventListener(
+                "notifications-updated",
+                handleNotificationsUpdated,
+            )
+        }
+    }, [])
 
   const stats = [
     { label: "Propiedades Activas", value: "5", icon: Building2, trend: "+1 este mes" }, // Pendiente conectar a PropertyService
@@ -208,18 +268,39 @@ export default function LandlordDashboard() {
             </Link>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {notifications.map((notification) => (
-                <div
-                  key={notification.id}
-                  className="p-3 bg-muted/50 rounded-lg"
-                >
-                  <p className="text-sm">{notification.message}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{notification.time}</p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
+          <div className="space-y-3">
+              {isLoading ? (
+                  <div className="flex justify-center py-4">
+                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  </div>
+              ) : recentNotifications.length === 0 ? (
+                  <p className="py-4 text-center text-sm text-muted-foreground">
+                      No hay notificaciones recientes.
+                  </p>
+              ) : (
+                  recentNotifications.map((notification) => (
+                      <div
+                          key={notification.id}
+                          className={`rounded-lg p-3 ${
+                              notification.isRead ? "bg-muted/50" : "bg-primary/5"
+                          }`}
+                      >
+                          <p className="line-clamp-2 text-sm font-medium">
+                              {displayTitle(notification.title)}
+                          </p>
+
+                          <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
+                              {displayMessage(notification.message)}
+                          </p>
+
+                          <p className="mt-1 text-xs text-muted-foreground">
+                              {formatNotificationTime(notification.createdAt)}
+                          </p>
+                      </div>
+                  ))
+              )}
+          </div>
+        </CardContent>
         </Card>
       </div>
 
