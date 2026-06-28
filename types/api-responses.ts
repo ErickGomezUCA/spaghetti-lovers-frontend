@@ -313,6 +313,7 @@ export type BlockType = 'RESERVATION' | 'MAINTENANCE' | 'PREVENTIVE_MAINTENANCE'
 
 export type ConflictResponse = {
   id: string
+  propertyId: string
   blockType: BlockType
   timestampStart: string
   timestampEnd: string

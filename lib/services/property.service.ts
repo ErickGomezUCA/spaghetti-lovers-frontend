@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/clients/api-client";
-import { ApiResponse, AvailabilityResponse, LandlordDashboardStats, Property } from "@/types/api-responses";
+import { ApiResponse, AvailabilityResponse, ConflictResponse, LandlordDashboardStats, Property } from "@/types/api-responses";
 import {
   AttachPhotoRequest,
   CreatePropertyRequest,
@@ -53,4 +53,9 @@ export const propertyService = {
 
   getLandlordStats: () =>
     apiClient.get<ApiResponse<LandlordDashboardStats>>("/properties/landlord/stats"),
+
+  getLandlordCalendar: (startDate: string, endDate: string) =>
+    apiClient.get<ApiResponse<ConflictResponse[]>>(
+      `/properties/landlord/calendar?startDate=${startDate}&endDate=${endDate}`,
+    ),
 };
