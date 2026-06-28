@@ -73,7 +73,7 @@ export default function NotificationsPage() {
     const [totalPages, setTotalPages] = useState(1)
     const [unreadCount, setUnreadCount] = useState(0)
 
-    const pageSize = 2
+    const pageSize = 10
 
     const fetchNotifications = async (
         currentPage = page,

@@ -2,6 +2,7 @@ import { apiClient } from "@/lib/clients/api-client"
 import {
   ApiResponse,
   ReservationResponse,
+  AccessCode,
   LandlordReservationSummaryResponse,
   ReservationDetailResponse,
   ReservationExtensionResponse,
