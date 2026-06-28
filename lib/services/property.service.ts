@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/clients/api-client";
-import { ApiResponse, Property, AvailabilityResponse } from "@/types/api-responses";
+import { ApiResponse, AvailabilityResponse, LandlordDashboardStats, Property } from "@/types/api-responses";
 import {
   AttachPhotoRequest,
   CreatePropertyRequest,
@@ -50,4 +50,7 @@ export const propertyService = {
       `/properties/attach-photos/${id}`,
       data,
     ),
+
+  getLandlordStats: () =>
+    apiClient.get<ApiResponse<LandlordDashboardStats>>("/properties/landlord/stats"),
 };

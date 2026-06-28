@@ -21,7 +21,8 @@ import {
 import { useAuth } from "@/lib/contexts/auth-context"
 
 import { reservationService } from "@/lib/services/reservation.service"
-import { ReservationResponse, LandlordReservationSummaryResponse } from "@/types/api-responses"
+import { propertyService } from "@/lib/services/property.service"
+import { ReservationResponse, LandlordReservationSummaryResponse, LandlordDashboardStats } from "@/types/api-responses"
 
 const pendingActions = [
   { type: "contract", message: "Contrato pendiente de firma - Casa Playa", priority: "high" },
@@ -64,19 +65,24 @@ export default function LandlordDashboard() {
 
   const [summary, setSummary] = useState<LandlordReservationSummaryResponse | null>(null)
   const [recentReservations, setRecentReservations] = useState<ReservationResponse[]>([])
+  const [landlordStats, setLandlordStats] = useState<LandlordDashboardStats | null>(null)
+  const [propertiesCount, setPropertiesCount] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       setIsLoading(true)
       try {
-        const [summaryRes, recentRes] = await Promise.all([
+        const [summaryRes, recentRes, statsRes, propsRes] = await Promise.all([
           reservationService.getLandlordSummary(),
-          reservationService.getLandlordReservations(0, 3)
+          reservationService.getLandlordReservations(0, 3),
+          propertyService.getLandlordStats(),
+          user ? propertyService.getByLandlord(user.id, 0, 1) : Promise.resolve(null),
         ])
-        
         setSummary(summaryRes.data)
         setRecentReservations(recentRes.data)
+        setLandlordStats(statsRes.data)
+        if (propsRes) setPropertiesCount(propsRes.pagination?.totalItems ?? null)
       } catch (error) {
         console.error("Error cargando datos del dashboard:", error)
       } finally {
@@ -85,18 +91,33 @@ export default function LandlordDashboard() {
     }
 
     fetchDashboardData()
-  }, [])
+  }, [user])
 
   const stats = [
-    { label: "Propiedades Activas", value: "5", icon: Building2, trend: "+1 este mes" }, // Pendiente conectar a PropertyService
-    { 
-      label: "Reservas Activas", 
-      value: summary ? (summary.active + summary.reserved).toString() : "0", 
-      icon: Calendar, 
-      trend: summary ? `${summary.reserved} pendientes de check-in` : "0 pendientes" 
+    {
+      label: "Propiedades",
+      value: propertiesCount !== null ? propertiesCount.toString() : "—",
+      icon: Building2,
+      trend: "",
     },
-    { label: "Ingresos del Mes", value: "$2,450", icon: DollarSign, trend: "+12% vs mes anterior" }, // Pendiente conectar a PaymentService
-    { label: "Ocupación Promedio", value: "78%", icon: TrendingUp, trend: "+5% este mes" },
+    {
+      label: "Reservas Activas",
+      value: summary ? (summary.active + summary.reserved).toString() : "0",
+      icon: Calendar,
+      trend: summary ? `${summary.reserved} pendientes de check-in` : "0 pendientes",
+    },
+    {
+      label: "Ingresos del Mes",
+      value: landlordStats ? `$${landlordStats.monthlyIncome.toLocaleString("es-CO", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : "—",
+      icon: DollarSign,
+      trend: "",
+    },
+    {
+      label: "Ocupación Promedio",
+      value: landlordStats ? `${landlordStats.averageOccupation}%` : "—",
+      icon: TrendingUp,
+      trend: "",
+    },
   ]
 
   return (
@@ -124,7 +145,7 @@ export default function LandlordDashboard() {
                 <div>
                   <p className="text-sm text-muted-foreground">{stat.label}</p>
                   <p className="text-2xl font-semibold mt-1">
-                    {isLoading && index === 1 ? <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /> : stat.value}
+                    {isLoading ? <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /> : stat.value}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">{stat.trend}</p>
                 </div>

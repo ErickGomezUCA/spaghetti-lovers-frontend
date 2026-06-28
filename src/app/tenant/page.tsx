@@ -9,6 +9,8 @@ import Link from 'next/link'
 import { useAuth } from '@/lib/contexts/auth-context'
 import { reservationService } from '@/lib/services/reservation.service'
 import { ratingService } from '@/lib/services/rating.service'
+import { contractService } from '@/lib/services/contract.service'
+import { maintenanceService } from '@/lib/services/maintenance.service'
 import { ReservationResponse } from '@/types/api-responses'
 
 const formatShortDate = (dateString: string) => {
@@ -42,6 +44,9 @@ export default function TenantDashboard() {
   const [isLoading, setIsLoading] = useState(true)
   const [averageRating, setAverageRating] = useState(0)
   const [totalRatings, setTotalRatings] = useState(0)
+  const [activeReservationsCount, setActiveReservationsCount] = useState(0)
+  const [contractsCount, setContractsCount] = useState(0)
+  const [maintenanceCount, setMaintenanceCount] = useState(0)
 
   useEffect(() => {
 
@@ -49,17 +54,19 @@ export default function TenantDashboard() {
       if (!user) return
       setIsLoading(true)
       try {
-        const [reservationsRes, ratingsRes] = await Promise.all([
+        const [reservationsRes, ratingsRes, activeRes, contractsRes, maintenanceRes] = await Promise.all([
           reservationService.getMyReservations(0, 10),
-          ratingService.getByUser(user.id)
+          ratingService.getByUser(user.id),
+          reservationService.getMyReservations(0, 1, undefined, undefined, "ACTIVE"),
+          contractService.getMyContracts(),
+          maintenanceService.getAll(0, 1),
         ])
         setReservations(reservationsRes.data || [])
-        setAverageRating(
-          ratingsRes.data?.averageScore ?? 0
-        )
-        setTotalRatings(
-          ratingsRes.data?.totalRatings ?? 0
-        )
+        setAverageRating(ratingsRes.data?.averageScore ?? 0)
+        setTotalRatings(ratingsRes.data?.totalRatings ?? 0)
+        setActiveReservationsCount(activeRes.pagination?.totalItems ?? 0)
+        setContractsCount(contractsRes.data?.length ?? 0)
+        setMaintenanceCount(maintenanceRes.pagination?.totalItems ?? 0)
       }
       catch (error) {
         console.error(
@@ -77,6 +84,7 @@ export default function TenantDashboard() {
   const activeReservations = reservations.filter(
     r => r.reservationStatus === 'ACTIVE' || r.reservationStatus === 'RESERVED'
   )
+
 
   return (
     <div className="space-y-6">
@@ -100,35 +108,39 @@ export default function TenantDashboard() {
             </div>
             <div>
               <p className="text-2xl font-bold">
-                {isLoading ? <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /> : activeReservations.length}
+                {isLoading ? <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /> : activeReservationsCount}
               </p>
               <p className="text-sm text-muted-foreground">Reservas Activas</p>
             </div>
           </CardContent>
         </Card>
 
-        {/* Contratos Pendientes (Pendiente de conexión) */}
+        {/* Contratos */}
         <Card>
           <CardContent className="flex items-center gap-4 p-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-amber-100">
               <FileText className="h-6 w-6 text-amber-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold">—</p>
-              <p className="text-xs text-muted-foreground">Contratos (Pendiente de conexión)</p>
+              <p className="text-2xl font-bold">
+                {isLoading ? <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /> : contractsCount}
+              </p>
+              <p className="text-sm text-muted-foreground">Contratos</p>
             </div>
           </CardContent>
         </Card>
 
-        {/* Mantenimientos (Pendiente de conexión) */}
+        {/* Mantenimientos */}
         <Card>
           <CardContent className="flex items-center gap-4 p-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-orange-100">
               <Wrench className="h-6 w-6 text-orange-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold">—</p>
-              <p className="text-xs text-muted-foreground">Mantenimientos (Pendiente de conexión)</p>
+              <p className="text-2xl font-bold">
+                {isLoading ? <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /> : maintenanceCount}
+              </p>
+              <p className="text-sm text-muted-foreground">Mantenimientos</p>
             </div>
           </CardContent>
         </Card>

@@ -334,5 +334,16 @@ export type ReservationCompletionResponse = {
     completedAt: string
 }
 
+export type LandlordDashboardStats = {
+    monthlyIncome: number
+    averageOccupation: number
+}
+
+export type AdminMonthlySummary = {
+    reservationsThisMonth: number
+    incomeThisMonth: number
+    averageOccupation: number
+}
+
 
 
