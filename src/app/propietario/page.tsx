@@ -14,8 +14,6 @@ import {
   Bell,
   Plus,
   ArrowRight,
-  Star,
-  Wrench,
   Loader2,
 } from "lucide-react"
 import { useAuth } from "@/lib/contexts/auth-context"
@@ -23,12 +21,6 @@ import { useAuth } from "@/lib/contexts/auth-context"
 import { reservationService } from "@/lib/services/reservation.service"
 import { propertyService } from "@/lib/services/property.service"
 import { ReservationResponse, LandlordReservationSummaryResponse, LandlordDashboardStats } from "@/types/api-responses"
-
-const pendingActions = [
-  { type: "contract", message: "Contrato pendiente de firma - Casa Playa", priority: "high" },
-  { type: "maintenance", message: "Solicitud de mantenimiento - Apartamento Centro", priority: "medium" },
-  { type: "rating", message: "Calificar inquilino - Reserva #1234", priority: "low" },
-]
 
 const notifications = [
   { id: "1", message: "Nueva reserva recibida para Casa Playa", time: "Hace 2 horas" },
@@ -244,66 +236,6 @@ export default function LandlordDashboard() {
         </Card>
       </div>
 
-      {/* Pending Actions */}
-      <Card className="border-t-4 border-t-primary">
-        <CardHeader>
-          <CardTitle className="text-lg font-semibold">Acciones Pendientes</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {pendingActions.map((action, index) => (
-              <div
-                key={index}
-                className="flex items-start gap-3 p-4 bg-muted/50 rounded-lg"
-              >
-                <div className={`p-2 rounded-lg ${
-                  action.priority === "high" ? "bg-red-100 text-red-600" :
-                  action.priority === "medium" ? "bg-yellow-100 text-yellow-600" :
-                  "bg-blue-100 text-blue-600"
-                }`}>
-                  {action.type === "contract" && <FileText className="w-4 h-4" />}
-                  {action.type === "maintenance" && <Wrench className="w-4 h-4" />}
-                  {action.type === "rating" && <Star className="w-4 h-4" />}
-                </div>
-                <div>
-                  <p className="text-sm font-medium">{action.message}</p>
-                  <Badge variant="outline" className={`mt-2 text-xs ${
-                    action.priority === "high" ? "border-red-500 text-red-600" :
-                    action.priority === "medium" ? "border-yellow-500 text-yellow-600" :
-                    "border-blue-500 text-blue-600"
-                  }`}>
-                    {action.priority === "high" ? "Alta prioridad" :
-                     action.priority === "medium" ? "Media prioridad" : "Baja prioridad"}
-                  </Badge>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
     </div>
-  )
-}
-
-function FileText(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-      <polyline points="14 2 14 8 20 8" />
-      <line x1="16" x2="8" y1="13" y2="13" />
-      <line x1="16" x2="8" y1="17" y2="17" />
-      <line x1="10" x2="8" y1="9" y2="9" />
-    </svg>
   )
 }

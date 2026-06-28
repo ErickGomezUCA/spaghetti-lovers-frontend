@@ -13,7 +13,6 @@ import {
   BarChart3,
   Bell,
   User,
-  Settings,
   LogOut,
   Key,
   DollarSign,
@@ -64,11 +63,6 @@ const landlordSections = [
     title: "Mi cuenta",
     items: [
       { href: "/propietario/perfil", label: "Mi Perfil", icon: User },
-      {
-        href: "/propietario/configuracion",
-        label: "Configuración",
-        icon: Settings,
-      },
     ],
   },
 ];
