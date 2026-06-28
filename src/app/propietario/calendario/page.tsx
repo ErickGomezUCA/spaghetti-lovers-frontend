@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Wrench, Ban } from "lucide-react"
+import { useSearchParams } from "next/navigation"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { propertyService } from "@/lib/services/property.service"
 import { Property, ConflictResponse, BlockType } from "@/types/api-responses"
@@ -36,6 +37,15 @@ export default function CalendarPage() {
   const [properties, setProperties] = useState<Property[]>([])
   const [conflicts, setConflicts] = useState<ConflictResponse[]>([])
   const [isLoading, setIsLoading] = useState(false)
+
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    const propertyId = searchParams.get("propertyId")
+    if (propertyId) {
+      setSelectedPropertyId(propertyId)
+    }
+  }, [searchParams])
 
   const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
     "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]

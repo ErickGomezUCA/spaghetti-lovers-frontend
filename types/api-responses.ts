@@ -333,5 +333,28 @@ export type ReservationCompletionResponse = {
     completedAt: string
 }
 
+export type PropertyReportResponse = {
+  propertyId: string
+  propertyTitle: string
+  period: {
+    start: string
+    end: string
+  }
+  occupancyRate: number
+  totalNightsOccupied: number
+  totalReservations: number
+  revenue: {
+    base: number
+    cleaning: number
+    penalties: number
+    total: number
+  }
+}
 
-
+export type UserResponse = {
+  id: string
+  name: string
+  email: string
+  phone?: string
+  role: string
+}
