@@ -421,3 +421,26 @@ export type UserResponse = {
   phone?: string;
   role: string;
 };
+
+export type FineType = "PROPERTY_DAMAGE" | "NOISE_VIOLATION" | "LATE_CHECKOUT" | "LATE_PAYMENT";
+
+export type FineSummaryResponse = {
+  fineId: string;
+  reservationId: string;
+  propertyName: string;
+  tenantName: string;
+  tenantEmail: string;
+  fineType: FineType;
+  description: string;
+  amount: number;
+  issuedAt: string;
+  resolvedAt: string | null;
+  paymentMethod: string | null;
+};
+
+export type FineSummaryStatsResponse = {
+  totalFines: number;
+  pendingCount: number;
+  pendingAmount: number;
+  resolvedAmount: number;
+};
