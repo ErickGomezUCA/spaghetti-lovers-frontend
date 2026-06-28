@@ -1,9 +1,9 @@
 export type PaginationMeta = {
   page: number;
   pageSize: number;
-  totalElements: number;
+  totalItems: number;
   totalPages: number;
-  hasNext: boolean;
+  hastNext: boolean;
 };
 
 export type ApiResponse<T> = {
@@ -166,20 +166,21 @@ export type ReservationStatus = "PENDING" | "RESERVED" | "ACTIVE" | "COMPLETED" 
 
 
 export type ReservationResponse = {
-    id: string;
-    propertyId?: string;
-    tenantId?: string;
-    propertyName: string;
-    tenantName: string;
-    tenantEmail: string;
-    checkInDate: string;
-    checkOutDate: string;
-    totalNights: number;
-    guestsCount: number;
-    totalPrice: number;
-    reservationStatus: ReservationStatus;
-    propertyCity: string;
-    propertyDepartment: string;
+  id: string;
+  propertyId?: string;
+  tenantId?: string;
+  propertyName: string;
+  tenantName: string;
+  tenantEmail: string;
+  landlordName: string;
+  checkInDate: string;
+  checkOutDate: string;
+  totalNights: number;
+  guestsCount: number;
+  totalPrice: number;
+  reservationStatus: ReservationStatus;
+  propertyCity: string;
+  propertyDepartment: string;
 };
 
 export type PaginatedResponse<T> = {
@@ -219,6 +220,8 @@ export type ReservationDetailResponse = {
     city: string;
     department: string;
     basePricePerNight: number;
+    securityDepositAmount: number;
+    mainPhotoUrl: string;
   };
 };
 
