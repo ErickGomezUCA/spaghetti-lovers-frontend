@@ -104,9 +104,9 @@ export type ContractDetailResponse = {
   landlordName: string;
 };
 
-export type MaintenanceStatus = "SCHEDULED" | "RESOLVING" | "RESOLVED"
+export type MaintenanceStatus = "SCHEDULED" | "RESOLVING" | "RESOLVED";
 
-export type Urgency = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
+export type Urgency = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
 export type MaintenanceResponse = {
   id: string;
@@ -121,10 +121,14 @@ export type MaintenanceResponse = {
   scheduledEnd: string | null;
   maintenanceStatus: MaintenanceStatus;
   photoUrls: string[];
-}
+};
 
-export type MaintenanceScheduleFrequency = "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY"
-export type MaintenanceScheduleStatus = "SCHEDULED" | "ACTIVE" | "DONE"
+export type MaintenanceScheduleFrequency =
+  | "DAILY"
+  | "WEEKLY"
+  | "MONTHLY"
+  | "YEARLY";
+export type MaintenanceScheduleStatus = "SCHEDULED" | "ACTIVE" | "DONE";
 
 export type MaintenanceScheduleResponse = {
   id: string;
@@ -137,7 +141,7 @@ export type MaintenanceScheduleResponse = {
   lastCompletedAt: string | null;
   nextScheduledDate: string;
   status: MaintenanceScheduleStatus;
-}
+};
 
 export type Property = {
   id: string;
@@ -163,24 +167,28 @@ export type Property = {
   updatedAt: string;
 };
 
-export type ReservationStatus = "PENDING" | "RESERVED" | "ACTIVE" | "COMPLETED" | "CANCELLED";
-
+export type ReservationStatus =
+  | "PENDING"
+  | "RESERVED"
+  | "ACTIVE"
+  | "COMPLETED"
+  | "CANCELLED";
 
 export type ReservationResponse = {
-    id: string;
-    propertyId?: string;
-    tenantId?: string;
-    propertyName: string;
-    tenantName: string;
-    tenantEmail: string;
-    checkInDate: string;
-    checkOutDate: string;
-    totalNights: number;
-    guestsCount: number;
-    totalPrice: number;
-    reservationStatus: ReservationStatus;
-    propertyCity: string;
-    propertyDepartment: string;
+  id: string;
+  propertyId?: string;
+  tenantId?: string;
+  propertyName: string;
+  tenantName: string;
+  tenantEmail: string;
+  checkInDate: string;
+  checkOutDate: string;
+  totalNights: number;
+  guestsCount: number;
+  totalPrice: number;
+  reservationStatus: ReservationStatus;
+  propertyCity: string;
+  propertyDepartment: string;
 };
 
 export type PaginatedResponse<T> = {
@@ -190,7 +198,7 @@ export type PaginatedResponse<T> = {
   totalItems: number;
   totalPages: number;
   hastNext: boolean;
-}
+};
 
 export type LandlordReservationSummaryResponse = {
   reserved: number;
@@ -238,14 +246,14 @@ export type ReservationExtensionResponse = {
   extensionPayment: PaymentResponse;
 };
 export type AccessCode = {
-    id: string;
-    propertyId: string;
-    reservationId: string;
-    code: string;
-    codeType: string;
-    validFrom: string;
-    validUntil: string;
-    isActive: boolean;
+  id: string;
+  propertyId: string;
+  reservationId: string;
+  code: string;
+  codeType: string;
+  validFrom: string;
+  validUntil: string;
+  isActive: boolean;
 };
 
 export type AccessCodeStatus = "ACTIVE" | "PENDING" | "EXPIRED" | "INACTIVE";
@@ -253,98 +261,134 @@ export type AccessCodeStatus = "ACTIVE" | "PENDING" | "EXPIRED" | "INACTIVE";
 export type CodeType = "ACCESS_CODE" | "RECOVERY_CODE";
 
 export type AccessCodeDetailResponse = {
-    accessCodeId: string;
-    reservationId: string;
-    propertyId: string;
-    propertyTitle: string;
-    propertyCity: string;
-    propertyDepartment: string;
-    tenantId: string;
-    tenantName: string;
-    code: string;
-    codeType: CodeType;
-    checkInDate: string;
-    checkOutDate: string;
-    validFrom: string;
-    validUntil: string;
-    isActive: boolean;
-    accessCodeStatus: AccessCodeStatus;
-    reservationStatus: string;
+  accessCodeId: string;
+  reservationId: string;
+  propertyId: string;
+  propertyTitle: string;
+  propertyCity: string;
+  propertyDepartment: string;
+  tenantId: string;
+  tenantName: string;
+  code: string;
+  codeType: CodeType;
+  checkInDate: string;
+  checkOutDate: string;
+  validFrom: string;
+  validUntil: string;
+  isActive: boolean;
+  accessCodeStatus: AccessCodeStatus;
+  reservationStatus: string;
 };
 
 export type ReservationCancellationPreviewResponse = {
-    reservationId: string;
-    reservationStatus: ReservationStatus;
-    checkInDate: string;
-    checkOutDate: string;
-    daysUntilCheckIn: number;
-    cancellationPenalty: number;
-    reservationRefundAmount: number;
-    cleaningFeeRefundAmount: number;
-    guaranteeDepositRefundAmount: number;
-    totalRefundAmount: number;
+  reservationId: string;
+  reservationStatus: ReservationStatus;
+  checkInDate: string;
+  checkOutDate: string;
+  daysUntilCheckIn: number;
+  cancellationPenalty: number;
+  reservationRefundAmount: number;
+  cleaningFeeRefundAmount: number;
+  guaranteeDepositRefundAmount: number;
+  totalRefundAmount: number;
 };
 
 export type ReservationCancellationResponse = {
-    reservationId: string;
-    reservationStatus: ReservationStatus;
-    cancellationPenalty: number;
-    reservationRefundAmount: number;
-    cleaningFeeRefundAmount: number;
-    guaranteeDepositRefundAmount: number;
-    totalRefundAmount: number;
-    cancelledAt: string;
+  reservationId: string;
+  reservationStatus: ReservationStatus;
+  cancellationPenalty: number;
+  reservationRefundAmount: number;
+  cleaningFeeRefundAmount: number;
+  guaranteeDepositRefundAmount: number;
+  totalRefundAmount: number;
+  cancelledAt: string;
 };
 
-export type NotificationType = "INFO" | "REMINDER" | "MAINTENANCE"
+export type NotificationType = "INFO" | "REMINDER" | "MAINTENANCE";
 
 export type NotificationResponse = {
-    id: string
-    userId: string
-    reservationId: string | null
-    type: NotificationType
-    title: string
-    message: string
-    isRead: boolean
-    createdAt: string
-}
+  id: string;
+  userId: string;
+  reservationId: string | null;
+  type: NotificationType;
+  title: string;
+  message: string;
+  isRead: boolean;
+  createdAt: string;
+};
 
-export type BlockType = 'RESERVATION' | 'MAINTENANCE' | 'PREVENTIVE_MAINTENANCE'
+export type BlockType =
+  | "RESERVATION"
+  | "MAINTENANCE"
+  | "PREVENTIVE_MAINTENANCE";
 
 export type ConflictResponse = {
-  id: string
-  propertyId: string
-  blockType: BlockType
-  timestampStart: string
-  timestampEnd: string
-  blockedReason: string | null
-}
+  id: string;
+  propertyId: string;
+  blockType: BlockType;
+  timestampStart: string;
+  timestampEnd: string;
+  blockedReason: string | null;
+};
 
 export type AvailabilityResponse = {
-  available: boolean
-  conflicts: ConflictResponse[]
-}
+  available: boolean;
+  conflicts: ConflictResponse[];
+};
+
+export type CalendarReservation = {
+  id: string;
+  propertyId: string;
+  propertyTitle: string;
+  title: string;
+  timestampStart: string;
+  timestampEnd: string;
+};
+
+export type CalendarMaintenance = {
+  id: string;
+  propertyId: string;
+  propertyTitle: string;
+  title: string;
+  maintenanceStatus: MaintenanceStatus;
+  urgency: Urgency;
+  scheduledStart: string;
+  scheduledEnd: string;
+};
+
+export type CalendarMaintenanceSchedule = {
+  id: string;
+  propertyId: string;
+  propertyTitle: string;
+  title: string;
+  status: MaintenanceScheduleStatus;
+  scheduledStart: string;
+  scheduledEnd: string;
+};
+
+export type LandlordCalendarResponse = {
+  reservations: CalendarReservation[];
+  maintenances: CalendarMaintenance[];
+  maintenanceSchedules: CalendarMaintenanceSchedule[];
+};
 
 export type ReservationCompletionResponse = {
-    reservationId: string
-    reservationStatus: ReservationStatus
-    guaranteeDepositAmount: number
-    retainedAmount: number
-    guaranteeDepositRefundAmount: number
-    additionalFinePaymentAmount: number
-    completedAt: string
-}
+  reservationId: string;
+  reservationStatus: ReservationStatus;
+  guaranteeDepositAmount: number;
+  retainedAmount: number;
+  guaranteeDepositRefundAmount: number;
+  additionalFinePaymentAmount: number;
+  completedAt: string;
+};
 
 export type LandlordDashboardStats = {
-    monthlyIncome: number
-    averageOccupation: number
-}
+  monthlyIncome: number;
+  averageOccupation: number;
+};
 
 export type AdminMonthlySummary = {
-    reservationsThisMonth: number
-    incomeThisMonth: number
-    averageOccupation: number
-}
-
-
-
+  reservationsThisMonth: number;
+  incomeThisMonth: number;
+  averageOccupation: number;
+};

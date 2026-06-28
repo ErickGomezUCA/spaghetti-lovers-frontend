@@ -572,15 +572,6 @@ export default function MaintenancePage() {
                   <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
                     <Calendar className="mb-2 h-8 w-8 opacity-50" />
                     <p>No hay programaciones para esta propiedad</p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-3"
-                      onClick={() => setShowScheduleDialog(true)}
-                    >
-                      <Plus className="w-4 h-4 mr-1" />
-                      Crear primera programación
-                    </Button>
                   </div>
                 ) : (
                   <Table>
@@ -641,7 +632,13 @@ export default function MaintenancePage() {
       </div>
 
       {/* Detail / Confirm / Resolve Dialog */}
-      <Dialog open={showDetailDialog} onOpenChange={(open) => { setShowDetailDialog(open); if (!open) setConfirmError(null); }}>
+      <Dialog
+        open={showDetailDialog}
+        onOpenChange={(open) => {
+          setShowDetailDialog(open);
+          if (!open) setConfirmError(null);
+        }}
+      >
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>

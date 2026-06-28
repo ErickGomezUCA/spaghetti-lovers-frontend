@@ -23,22 +23,35 @@ import {
   ChevronRight,
   Calendar as CalendarIcon,
   Wrench,
-  Ban,
+  Clock,
 } from "lucide-react";
 import { useAuth } from "@/lib/contexts/auth-context";
 import { propertyService } from "@/lib/services/property.service";
-import { Property, ConflictResponse, BlockType } from "@/types/api-responses";
+import { Property } from "@/types/api-responses";
 
-const eventTypeColors: Record<BlockType, string> = {
-  RESERVATION: "bg-blue-100 text-blue-700 border-blue-200",
-  MAINTENANCE: "bg-orange-100 text-orange-700 border-orange-200",
-  PREVENTIVE_MAINTENANCE: "bg-purple-100 text-purple-700 border-purple-200",
+type EntryType = "RESERVATION" | "MAINTENANCE" | "MAINTENANCE_SCHEDULE";
+
+type CalendarEntry = {
+  id: string;
+  type: EntryType;
+  propertyId: string;
+  propertyTitle: string;
+  title: string;
+  timestampStart: string;
+  timestampEnd: string;
+  status?: string;
 };
 
-const eventTypeLabels: Record<BlockType, string> = {
+const entryTypeColors: Record<EntryType, string> = {
+  RESERVATION: "bg-blue-100 text-blue-700 border-blue-200",
+  MAINTENANCE: "bg-orange-100 text-orange-700 border-orange-200",
+  MAINTENANCE_SCHEDULE: "bg-purple-100 text-purple-700 border-purple-200",
+};
+
+const entryTypeLabels: Record<EntryType, string> = {
   RESERVATION: "Reserva",
   MAINTENANCE: "Mantenimiento",
-  PREVENTIVE_MAINTENANCE: "Mantenimiento Preventivo",
+  MAINTENANCE_SCHEDULE: "Mantenimiento Preventivo",
 };
 
 export default function CalendarPage() {
@@ -47,7 +60,7 @@ export default function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>("all");
   const [properties, setProperties] = useState<Property[]>([]);
-  const [conflicts, setConflicts] = useState<ConflictResponse[]>([]);
+  const [entries, setEntries] = useState<CalendarEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showAllEvents, setShowAllEvents] = useState(false);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
@@ -70,20 +83,14 @@ export default function CalendarPage() {
 
   useEffect(() => {
     if (!user) return;
-    const fetchProperties = async () => {
-      try {
-        const res = await propertyService.getByLandlord(user.id);
-        setProperties(res.data ?? []);
-      } catch (err) {
-        console.error("Error fetching properties:", err);
-      }
-    };
-    fetchProperties();
+    propertyService
+      .getByLandlord(user.id)
+      .then((res) => setProperties(res.data ?? []))
+      .catch(() => {});
   }, [user]);
 
   useEffect(() => {
     if (!user) return;
-
     const fetchCalendar = async () => {
       setIsLoading(true);
       try {
@@ -97,15 +104,47 @@ export default function CalendarPage() {
           startDate,
           endDate,
         );
-        setConflicts(res.data ?? []);
-      } catch (err) {
-        console.error("Error fetching calendar:", err);
-        setConflicts([]);
+        const data = res.data;
+
+        const merged: CalendarEntry[] = [
+          ...(data.reservations ?? []).map((r) => ({
+            id: r.id,
+            type: "RESERVATION" as EntryType,
+            propertyId: r.propertyId,
+            propertyTitle: r.propertyTitle,
+            title: r.title ?? "Reserva",
+            timestampStart: r.timestampStart,
+            timestampEnd: r.timestampEnd,
+          })),
+          ...(data.maintenances ?? []).map((m) => ({
+            id: m.id,
+            type: "MAINTENANCE" as EntryType,
+            propertyId: m.propertyId,
+            propertyTitle: m.propertyTitle,
+            title: m.title,
+            timestampStart: m.scheduledStart,
+            timestampEnd: m.scheduledEnd,
+            status: m.maintenanceStatus,
+          })),
+          ...(data.maintenanceSchedules ?? []).map((s) => ({
+            id: s.id,
+            type: "MAINTENANCE_SCHEDULE" as EntryType,
+            propertyId: s.propertyId,
+            propertyTitle: s.propertyTitle,
+            title: s.title,
+            timestampStart: s.scheduledStart,
+            timestampEnd: s.scheduledEnd,
+            status: s.status,
+          })),
+        ];
+
+        setEntries(merged);
+      } catch {
+        setEntries([]);
       } finally {
         setIsLoading(false);
       }
     };
-
     fetchCalendar();
   }, [user, currentDate]);
 
@@ -119,16 +158,16 @@ export default function CalendarPage() {
       new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1),
     );
 
-  const visibleConflicts =
+  const visibleEntries =
     selectedPropertyId === "all"
-      ? conflicts
-      : conflicts.filter((c) => c.propertyId === selectedPropertyId);
+      ? entries
+      : entries.filter((e) => e.propertyId === selectedPropertyId);
 
-  const getConflictsForDay = (day: number) => {
+  const getEntriesForDay = (day: number) => {
     const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    return visibleConflicts.filter((conflict) => {
-      const start = conflict.timestampStart.split("T")[0];
-      const end = conflict.timestampEnd.split("T")[0];
+    return visibleEntries.filter((entry) => {
+      const start = entry.timestampStart.split("T")[0];
+      const end = entry.timestampEnd.split("T")[0];
       return dateStr >= start && dateStr <= end;
     });
   };
@@ -152,24 +191,24 @@ export default function CalendarPage() {
     for (let i = 0; i < totalCells; i++) {
       const day = i - firstDayOfMonth + 1;
       const isCurrentMonth = day > 0 && day <= daysInMonth;
-      const dayConflicts = isCurrentMonth ? getConflictsForDay(day) : [];
+      const dayEntries = isCurrentMonth ? getEntriesForDay(day) : [];
       const isToday =
         isCurrentMonth &&
         day === today.getDate() &&
         currentDate.getMonth() === today.getMonth() &&
         currentDate.getFullYear() === today.getFullYear();
 
+      const visibleCount = dayEntries.length >= 3 ? 1 : 2;
+
       days.push(
         <div
           key={i}
           onClick={() => {
-            if (isCurrentMonth && dayConflicts.length > 0) {
-              setSelectedDay(day);
-            }
+            if (isCurrentMonth && dayEntries.length > 0) setSelectedDay(day);
           }}
           className={`min-h-24 p-2 border border-border transition-colors ${
             isCurrentMonth
-              ? dayConflicts.length > 0
+              ? dayEntries.length > 0
                 ? "bg-card hover:bg-muted/40 cursor-pointer"
                 : "bg-card"
               : "bg-muted/30"
@@ -183,20 +222,17 @@ export default function CalendarPage() {
                 {day}
               </span>
               <div className="mt-1 space-y-1">
-                {dayConflicts
-                  .slice(0, dayConflicts.length >= 3 ? 1 : 2)
-                  .map((conflict) => (
-                    <div
-                      key={conflict.id}
-                      className={`text-xs p-1 rounded truncate ${eventTypeColors[conflict.blockType]}`}
-                    >
-                      {conflict.blockedReason ??
-                        eventTypeLabels[conflict.blockType]}
-                    </div>
-                  ))}
-                {dayConflicts.length >= 3 && (
+                {dayEntries.slice(0, visibleCount).map((entry) => (
+                  <div
+                    key={entry.id}
+                    className={`text-xs p-1 rounded truncate ${entryTypeColors[entry.type]}`}
+                  >
+                    {entry.title}
+                  </div>
+                ))}
+                {dayEntries.length >= 3 && (
                   <span className="text-xs text-muted-foreground">
-                    +{dayConflicts.length - 1} más
+                    +{dayEntries.length - 1} más
                   </span>
                 )}
               </div>
@@ -207,6 +243,14 @@ export default function CalendarPage() {
     }
     return days;
   };
+
+  const dialogEntries =
+    selectedDay !== null ? getEntriesForDay(selectedDay) : visibleEntries;
+
+  const dialogTitle =
+    selectedDay !== null
+      ? `Eventos del ${selectedDay} de ${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()}`
+      : `Todos los eventos: ${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
 
   return (
     <div className="p-6 space-y-6">
@@ -237,42 +281,6 @@ export default function CalendarPage() {
           </SelectContent>
         </Select>
       </div>
-
-      {/* Dialog: todos los eventos / eventos del día */}
-      <Dialog
-        open={showAllEvents || selectedDay !== null}
-        onOpenChange={(open) => {
-          if (!open) {
-            setShowAllEvents(false);
-            setSelectedDay(null);
-          }
-        }}
-      >
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>
-              {selectedDay !== null
-                ? `Eventos del ${selectedDay} de ${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()}`
-                : `Todos los eventos — ${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()}`}
-            </DialogTitle>
-          </DialogHeader>
-          <ScrollArea className="max-h-[60vh] pr-4">
-            <div className="space-y-3">
-              {(selectedDay !== null
-                ? getConflictsForDay(selectedDay)
-                : visibleConflicts
-              ).map((conflict) => (
-                <EventItem
-                  key={conflict.id}
-                  conflict={conflict}
-                  selectedPropertyId={selectedPropertyId}
-                  properties={properties}
-                />
-              ))}
-            </div>
-          </ScrollArea>
-        </DialogContent>
-      </Dialog>
 
       {/* Calendario */}
       <Card className="border-t-4 border-t-primary">
@@ -338,28 +346,27 @@ export default function CalendarPage() {
               <p className="text-muted-foreground text-sm">
                 Cargando eventos...
               </p>
-            ) : visibleConflicts.length === 0 ? (
+            ) : visibleEntries.length === 0 ? (
               <p className="text-muted-foreground text-sm">
                 No hay eventos este mes.
               </p>
             ) : (
               <div className="space-y-3">
-                {visibleConflicts.slice(0, 2).map((conflict) => (
-                  <EventItem
-                    key={conflict.id}
-                    conflict={conflict}
-                    selectedPropertyId={selectedPropertyId}
-                    properties={properties}
+                {visibleEntries.slice(0, 2).map((entry) => (
+                  <EntryItem
+                    key={entry.id}
+                    entry={entry}
+                    showProperty={selectedPropertyId === "all"}
                   />
                 ))}
-                {visibleConflicts.length > 2 && (
+                {visibleEntries.length > 2 && (
                   <Button
                     variant="outline"
                     size="sm"
                     className="w-full mt-1"
                     onClick={() => setShowAllEvents(true)}
                   >
-                    Ver más ({visibleConflicts.length - 2} más)
+                    Ver más ({visibleEntries.length - 2} más)
                   </Button>
                 )}
               </div>
@@ -367,68 +374,99 @@ export default function CalendarPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Dialog */}
+      <Dialog
+        open={showAllEvents || selectedDay !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowAllEvents(false);
+            setSelectedDay(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{dialogTitle}</DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh] pr-4">
+            <div className="space-y-3">
+              {dialogEntries.map((entry) => (
+                <EntryItem
+                  key={entry.id}
+                  entry={entry}
+                  showProperty={selectedPropertyId === "all"}
+                />
+              ))}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-function EventItem({
-  conflict,
-  selectedPropertyId,
-  properties,
+function EntryItem({
+  entry,
+  showProperty,
 }: {
-  conflict: ConflictResponse;
-  selectedPropertyId: string;
-  properties: Property[];
+  entry: CalendarEntry;
+  showProperty: boolean;
 }) {
-  const eventTypeColors: Record<BlockType, string> = {
+  const entryTypeColors: Record<EntryType, string> = {
     RESERVATION: "bg-blue-100 text-blue-700 border-blue-200",
     MAINTENANCE: "bg-orange-100 text-orange-700 border-orange-200",
-    PREVENTIVE_MAINTENANCE: "bg-purple-100 text-purple-700 border-purple-200",
+    MAINTENANCE_SCHEDULE: "bg-purple-100 text-purple-700 border-purple-200",
   };
-  const eventTypeLabels: Record<BlockType, string> = {
+
+  const entryTypeLabels: Record<EntryType, string> = {
     RESERVATION: "Reserva",
     MAINTENANCE: "Mantenimiento",
-    PREVENTIVE_MAINTENANCE: "Mantenimiento Preventivo",
+    MAINTENANCE_SCHEDULE: "Mantenimiento Preventivo",
   };
+
+  const Icon =
+    entry.type === "RESERVATION"
+      ? CalendarIcon
+      : entry.type === "MAINTENANCE"
+        ? Wrench
+        : Clock;
+
+  const iconColor =
+    entry.type === "RESERVATION"
+      ? "text-blue-600"
+      : entry.type === "MAINTENANCE"
+        ? "text-orange-600"
+        : "text-purple-600";
+
+  const iconBg =
+    entry.type === "RESERVATION"
+      ? "bg-blue-100"
+      : entry.type === "MAINTENANCE"
+        ? "bg-orange-100"
+        : "bg-purple-100";
 
   return (
     <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
       <div className="flex items-center gap-3">
-        <div
-          className={`p-2 rounded-lg ${
-            conflict.blockType === "RESERVATION"
-              ? "bg-blue-100"
-              : conflict.blockType === "MAINTENANCE"
-                ? "bg-orange-100"
-                : "bg-purple-100"
-          }`}
-        >
-          {conflict.blockType === "RESERVATION" ? (
-            <CalendarIcon className="w-4 h-4 text-blue-600" />
-          ) : conflict.blockType === "MAINTENANCE" ? (
-            <Wrench className="w-4 h-4 text-orange-600" />
-          ) : (
-            <Ban className="w-4 h-4 text-purple-600" />
-          )}
+        <div className={`p-2 rounded-lg ${iconBg}`}>
+          <Icon className={`w-4 h-4 ${iconColor}`} />
         </div>
         <div>
-          <p className="font-medium text-sm">
-            {conflict.blockedReason ?? eventTypeLabels[conflict.blockType]}
-          </p>
-          {selectedPropertyId === "all" && (
+          <p className="font-medium text-sm">{entry.title}</p>
+          {showProperty && (
             <p className="text-xs text-primary font-medium">
-              {properties.find((p) => p.id === conflict.propertyId)?.title ??
-                conflict.propertyId}
+              {entry.propertyTitle}
             </p>
           )}
           <p className="text-xs text-muted-foreground">
-            {new Date(conflict.timestampStart).toLocaleDateString("es-ES")} -{" "}
-            {new Date(conflict.timestampEnd).toLocaleDateString("es-ES")}
+            {new Date(entry.timestampStart).toLocaleDateString("es-ES")} —{" "}
+            {new Date(entry.timestampEnd).toLocaleDateString("es-ES")}
           </p>
         </div>
       </div>
-      <Badge variant="outline" className={eventTypeColors[conflict.blockType]}>
-        {eventTypeLabels[conflict.blockType]}
+      <Badge variant="outline" className={entryTypeColors[entry.type]}>
+        {entryTypeLabels[entry.type]}
       </Badge>
     </div>
   );
