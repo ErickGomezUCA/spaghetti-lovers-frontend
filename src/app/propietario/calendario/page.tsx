@@ -5,6 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -42,6 +49,8 @@ export default function CalendarPage() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [conflicts, setConflicts] = useState<ConflictResponse[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [showAllEvents, setShowAllEvents] = useState(false);
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
 
   const monthNames = [
     "Enero",
@@ -153,7 +162,18 @@ export default function CalendarPage() {
       days.push(
         <div
           key={i}
-          className={`min-h-24 p-2 border border-border ${isCurrentMonth ? "bg-card" : "bg-muted/30"}`}
+          onClick={() => {
+            if (isCurrentMonth && dayConflicts.length > 0) {
+              setSelectedDay(day);
+            }
+          }}
+          className={`min-h-24 p-2 border border-border transition-colors ${
+            isCurrentMonth
+              ? dayConflicts.length > 0
+                ? "bg-card hover:bg-muted/40 cursor-pointer"
+                : "bg-card"
+              : "bg-muted/30"
+          }`}
         >
           {isCurrentMonth && (
             <>
@@ -163,18 +183,20 @@ export default function CalendarPage() {
                 {day}
               </span>
               <div className="mt-1 space-y-1">
-                {dayConflicts.slice(0, 2).map((conflict) => (
-                  <div
-                    key={conflict.id}
-                    className={`text-xs p-1 rounded truncate ${eventTypeColors[conflict.blockType]}`}
-                  >
-                    {conflict.blockedReason ??
-                      eventTypeLabels[conflict.blockType]}
-                  </div>
-                ))}
-                {dayConflicts.length > 2 && (
+                {dayConflicts
+                  .slice(0, dayConflicts.length >= 3 ? 1 : 2)
+                  .map((conflict) => (
+                    <div
+                      key={conflict.id}
+                      className={`text-xs p-1 rounded truncate ${eventTypeColors[conflict.blockType]}`}
+                    >
+                      {conflict.blockedReason ??
+                        eventTypeLabels[conflict.blockType]}
+                    </div>
+                  ))}
+                {dayConflicts.length >= 3 && (
                   <span className="text-xs text-muted-foreground">
-                    +{dayConflicts.length - 2} más
+                    +{dayConflicts.length - 1} más
                   </span>
                 )}
               </div>
@@ -216,6 +238,75 @@ export default function CalendarPage() {
         </Select>
       </div>
 
+      {/* Dialog: todos los eventos / eventos del día */}
+      <Dialog
+        open={showAllEvents || selectedDay !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowAllEvents(false);
+            setSelectedDay(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedDay !== null
+                ? `Eventos del ${selectedDay} de ${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()}`
+                : `Todos los eventos — ${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()}`}
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh] pr-4">
+            <div className="space-y-3">
+              {(selectedDay !== null
+                ? getConflictsForDay(selectedDay)
+                : visibleConflicts
+              ).map((conflict) => (
+                <EventItem
+                  key={conflict.id}
+                  conflict={conflict}
+                  selectedPropertyId={selectedPropertyId}
+                  properties={properties}
+                />
+              ))}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Calendario */}
+      <Card className="border-t-4 border-t-primary">
+        <CardHeader className="flex flex-row items-center justify-between pb-4">
+          <div className="flex items-center gap-4">
+            <Button variant="outline" size="icon" onClick={goToPreviousMonth}>
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <h2 className="text-xl font-semibold">
+              {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
+            </h2>
+            <Button variant="outline" size="icon" onClick={goToNextMonth}>
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+          {isLoading && (
+            <p className="text-sm text-muted-foreground">Cargando...</p>
+          )}
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-7 mb-2">
+            {dayNames.map((day) => (
+              <div
+                key={day}
+                className="text-center text-sm font-medium text-muted-foreground py-2"
+              >
+                {day}
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7">{renderCalendarDays()}</div>
+        </CardContent>
+      </Card>
+
       {/* Leyenda y Eventos */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="border-t-4 border-t-primary">
@@ -253,98 +344,92 @@ export default function CalendarPage() {
               </p>
             ) : (
               <div className="space-y-3">
-                {visibleConflicts.map((conflict) => (
-                  <div
+                {visibleConflicts.slice(0, 2).map((conflict) => (
+                  <EventItem
                     key={conflict.id}
-                    className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`p-2 rounded-lg ${
-                          conflict.blockType === "RESERVATION"
-                            ? "bg-blue-100"
-                            : conflict.blockType === "MAINTENANCE"
-                              ? "bg-orange-100"
-                              : "bg-purple-100"
-                        }`}
-                      >
-                        {conflict.blockType === "RESERVATION" ? (
-                          <CalendarIcon className="w-4 h-4 text-blue-600" />
-                        ) : conflict.blockType === "MAINTENANCE" ? (
-                          <Wrench className="w-4 h-4 text-orange-600" />
-                        ) : (
-                          <Ban className="w-4 h-4 text-purple-600" />
-                        )}
-                      </div>
-                      <div>
-                        <p className="font-medium text-sm">
-                          {conflict.blockedReason ??
-                            eventTypeLabels[conflict.blockType]}
-                        </p>
-                        {selectedPropertyId === "all" && (
-                          <p className="text-xs text-primary font-medium">
-                            {properties.find(
-                              (p) => p.id === conflict.propertyId,
-                            )?.title ?? conflict.propertyId}
-                          </p>
-                        )}
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(conflict.timestampStart).toLocaleDateString(
-                            "es-ES",
-                          )}{" "}
-                          -{" "}
-                          {new Date(conflict.timestampEnd).toLocaleDateString(
-                            "es-ES",
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                    <Badge
-                      variant="outline"
-                      className={eventTypeColors[conflict.blockType]}
-                    >
-                      {eventTypeLabels[conflict.blockType]}
-                    </Badge>
-                  </div>
+                    conflict={conflict}
+                    selectedPropertyId={selectedPropertyId}
+                    properties={properties}
+                  />
                 ))}
+                {visibleConflicts.length > 2 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full mt-1"
+                    onClick={() => setShowAllEvents(true)}
+                  >
+                    Ver más ({visibleConflicts.length - 2} más)
+                  </Button>
+                )}
               </div>
             )}
           </CardContent>
         </Card>
       </div>
+    </div>
+  );
+}
 
-      {/* Calendario */}
-      <Card className="border-t-4 border-t-primary">
-        <CardHeader className="flex flex-row items-center justify-between pb-4">
-          <div className="flex items-center gap-4">
-            <Button variant="outline" size="icon" onClick={goToPreviousMonth}>
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            <h2 className="text-xl font-semibold">
-              {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
-            </h2>
-            <Button variant="outline" size="icon" onClick={goToNextMonth}>
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </div>
-          {isLoading && (
-            <p className="text-sm text-muted-foreground">Cargando...</p>
+function EventItem({
+  conflict,
+  selectedPropertyId,
+  properties,
+}: {
+  conflict: ConflictResponse;
+  selectedPropertyId: string;
+  properties: Property[];
+}) {
+  const eventTypeColors: Record<BlockType, string> = {
+    RESERVATION: "bg-blue-100 text-blue-700 border-blue-200",
+    MAINTENANCE: "bg-orange-100 text-orange-700 border-orange-200",
+    PREVENTIVE_MAINTENANCE: "bg-purple-100 text-purple-700 border-purple-200",
+  };
+  const eventTypeLabels: Record<BlockType, string> = {
+    RESERVATION: "Reserva",
+    MAINTENANCE: "Mantenimiento",
+    PREVENTIVE_MAINTENANCE: "Mantenimiento Preventivo",
+  };
+
+  return (
+    <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+      <div className="flex items-center gap-3">
+        <div
+          className={`p-2 rounded-lg ${
+            conflict.blockType === "RESERVATION"
+              ? "bg-blue-100"
+              : conflict.blockType === "MAINTENANCE"
+                ? "bg-orange-100"
+                : "bg-purple-100"
+          }`}
+        >
+          {conflict.blockType === "RESERVATION" ? (
+            <CalendarIcon className="w-4 h-4 text-blue-600" />
+          ) : conflict.blockType === "MAINTENANCE" ? (
+            <Wrench className="w-4 h-4 text-orange-600" />
+          ) : (
+            <Ban className="w-4 h-4 text-purple-600" />
           )}
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-7 mb-2">
-            {dayNames.map((day) => (
-              <div
-                key={day}
-                className="text-center text-sm font-medium text-muted-foreground py-2"
-              >
-                {day}
-              </div>
-            ))}
-          </div>
-          <div className="grid grid-cols-7">{renderCalendarDays()}</div>
-        </CardContent>
-      </Card>
+        </div>
+        <div>
+          <p className="font-medium text-sm">
+            {conflict.blockedReason ?? eventTypeLabels[conflict.blockType]}
+          </p>
+          {selectedPropertyId === "all" && (
+            <p className="text-xs text-primary font-medium">
+              {properties.find((p) => p.id === conflict.propertyId)?.title ??
+                conflict.propertyId}
+            </p>
+          )}
+          <p className="text-xs text-muted-foreground">
+            {new Date(conflict.timestampStart).toLocaleDateString("es-ES")} -{" "}
+            {new Date(conflict.timestampEnd).toLocaleDateString("es-ES")}
+          </p>
+        </div>
+      </div>
+      <Badge variant="outline" className={eventTypeColors[conflict.blockType]}>
+        {eventTypeLabels[conflict.blockType]}
+      </Badge>
     </div>
   );
 }
