@@ -29,7 +29,10 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<UserProfileResponse | null>(null);
 
   useEffect(() => {
-    userService.getProfile().then((res) => setProfile(res.data)).catch(() => {});
+    userService
+      .getProfile()
+      .then((res) => setProfile(res.data))
+      .catch(() => {});
   }, []);
 
   const averageScore = profile?.averageScore?.toFixed(1) ?? "N/A";
@@ -222,15 +225,6 @@ export default function ProfilePage() {
                 </p>
               </div>
               <Badge className="bg-green-100 text-green-800">Activo</Badge>
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium">Idioma</p>
-                <p className="text-sm text-muted-foreground">Español (ES)</p>
-              </div>
-              <Button variant="ghost" size="sm">
-                Cambiar
-              </Button>
             </div>
           </CardContent>
         </Card>
