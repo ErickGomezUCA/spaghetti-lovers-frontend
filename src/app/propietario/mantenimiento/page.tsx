@@ -126,6 +126,7 @@ export default function MaintenancePage() {
     nextScheduledDate: "",
   });
   const [isConfirming, setIsConfirming] = useState(false);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
   const [isResolving, setIsResolving] = useState(false);
   const [isCreatingSchedule, setIsCreatingSchedule] = useState(false);
   const [resolvePhotos, setResolvePhotos] = useState<
@@ -187,6 +188,7 @@ export default function MaintenancePage() {
     )
       return;
     setIsConfirming(true);
+    setConfirmError(null);
     try {
       const res = await maintenanceService.confirm(selectedMaintenance.id, {
         scheduledStart: confirmForm.scheduledStart,
@@ -204,14 +206,11 @@ export default function MaintenancePage() {
         blockCalendar: false,
       });
     } catch (err: unknown) {
-      toast({
-        title: "Error al confirmar",
-        description:
-          err instanceof Error
-            ? err.message
-            : "No se pudo confirmar el mantenimiento.",
-        variant: "destructive",
-      });
+      setConfirmError(
+        err instanceof Error
+          ? err.message
+          : "No se pudo confirmar el mantenimiento.",
+      );
     } finally {
       setIsConfirming(false);
     }
@@ -642,7 +641,7 @@ export default function MaintenancePage() {
       </div>
 
       {/* Detail / Confirm / Resolve Dialog */}
-      <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
+      <Dialog open={showDetailDialog} onOpenChange={(open) => { setShowDetailDialog(open); if (!open) setConfirmError(null); }}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>
@@ -728,6 +727,9 @@ export default function MaintenancePage() {
                       />
                     </div>
                   </div>
+                  {confirmError && (
+                    <p className="text-sm text-destructive">{confirmError}</p>
+                  )}
                   <div className="flex items-center gap-2">
                     <Checkbox
                       id="blockCalendar"
