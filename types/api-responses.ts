@@ -335,6 +335,7 @@ export type ReservationCompletionResponse = {
 
 export type PropertyReportResponse = {
   propertyId: string
+  propertyTitle: string
   period: {
     start: string
     end: string

@@ -23,7 +23,7 @@ import { propertyService } from "@/lib/services/property.service"
 import { Property, PropertyReportResponse } from "@/types/api-responses"
 import { ApiError } from "@/lib/exceptions/api-exceptions"
 
-// ✅ Función utilitaria FUERA del componente (no usa hooks, está bien aquí)
+// Función utilitaria FUERA del componente (no usa hooks)
 function getMonthRanges(start: string, end: string) {
   const months = []
   const current = new Date(start + "T00:00:00")
@@ -63,7 +63,6 @@ export default function ReportsPage() {
   const [singleReport, setSingleReport] = useState<PropertyReportResponse | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // ✅ useState DENTRO del componente
   const [monthlyData, setMonthlyData] = useState<{ label: string; occupancy: number; revenue: number }[]>([])
 
   useEffect(() => {
@@ -142,14 +141,11 @@ export default function ReportsPage() {
     ? Math.round(activeReports.reduce((sum, r) => sum + r.occupancyRate, 0) / activeReports.length * 10) / 10
     : 0
 
-  const revenueByProperty = activeReports.map((r) => {
-    const property = properties.find(p => p.id === r.propertyId)
-    return {
-      property: property?.title ?? r.propertyId.slice(0, 8),
-      revenue: Number(r.revenue.total),
-      reservations: r.totalReservations,
-    }
-  })
+  const revenueByProperty = activeReports.map((r) => ({
+  property: r.propertyTitle,  
+  revenue: Number(r.revenue.total),
+  reservations: r.totalReservations,
+  }))
 
   const revenueBreakdown = [
     { name: "Base", value: activeReports.reduce((sum, r) => sum + Number(r.revenue.base), 0), color: "#1e40af" },
@@ -439,35 +435,32 @@ export default function ReportsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {activeReports.map((report) => {
-                    const property = properties.find(p => p.id === report.propertyId)
-                    return (
-                      <tr key={report.propertyId} className="border-b last:border-0 hover:bg-muted/50">
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-2">
-                            <Building2 className="w-4 h-4 text-primary" />
-                            <span className="font-medium">{property?.title ?? report.propertyId.slice(0, 8)}</span>
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 text-right">{report.totalReservations}</td>
-                        <td className="py-3 px-4 text-right">{report.totalNightsOccupied}</td>
-                        <td className="py-3 px-4 text-right">
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                            report.occupancyRate >= 75 ? "bg-green-100 text-green-700" :
-                            report.occupancyRate >= 50 ? "bg-yellow-100 text-yellow-700" :
-                            "bg-red-100 text-red-700"
-                          }`}>
-                            {report.occupancyRate}%
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-right">${Number(report.revenue.base).toLocaleString()}</td>
-                        <td className="py-3 px-4 text-right">${Number(report.revenue.cleaning).toLocaleString()}</td>
-                        <td className="py-3 px-4 text-right font-bold text-green-600">
-                          ${Number(report.revenue.total).toLocaleString()}
-                        </td>
-                      </tr>
-                    )
-                  })}
+                  {activeReports.map((report) => (
+                    <tr key={report.propertyId} className="border-b last:border-0 hover:bg-muted/50">
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2">
+                          <Building2 className="w-4 h-4 text-primary" />
+                          <span className="font-medium">{report.propertyTitle}</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-right">{report.totalReservations}</td>
+                      <td className="py-3 px-4 text-right">{report.totalNightsOccupied}</td>
+                      <td className="py-3 px-4 text-right">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                          report.occupancyRate >= 75 ? "bg-green-100 text-green-700" :
+                          report.occupancyRate >= 50 ? "bg-yellow-100 text-yellow-700" :
+                          "bg-red-100 text-red-700"
+                        }`}>
+                          {report.occupancyRate}%
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-right">${Number(report.revenue.base).toLocaleString()}</td>
+                      <td className="py-3 px-4 text-right">${Number(report.revenue.cleaning).toLocaleString()}</td>
+                      <td className="py-3 px-4 text-right font-bold text-green-600">
+                        ${Number(report.revenue.total).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
                 <tfoot>
                   <tr className="bg-muted/50 font-semibold">

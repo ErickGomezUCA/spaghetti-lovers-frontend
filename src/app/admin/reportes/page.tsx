@@ -139,8 +139,7 @@ export default function AdminReportsPage() {
   const totalProperties = activeReports.length
 
   const revenueByProperty = activeReports.map((r) => ({
-    property: r.propertyId.slice(0, 8), // fallback — no tenemos título aquí
-    revenue: Number(r.revenue.total),
+    property: r.propertyTitle,    revenue: Number(r.revenue.total),
   }))
 
   const revenueBreakdown = [
@@ -155,9 +154,9 @@ export default function AdminReportsPage() {
   const selectedLandlord = landlords.find(l => l.id === selectedLandlordId)
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       {/* Header */}
-      <div>
+      <div className="mb-2">
         <h1 className="text-2xl font-semibold text-foreground">Reportes — Admin</h1>
         <p className="text-muted-foreground">
           {selectedLandlordId === "all"
@@ -442,7 +441,7 @@ export default function AdminReportsPage() {
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2">
                           <Building2 className="w-4 h-4 text-primary" />
-                          <span className="font-medium">{report.propertyId.slice(0, 8)}</span>
+                          <span className="font-medium">{report.propertyTitle}</span>
                         </div>
                       </td>
                       <td className="py-3 px-4 text-right">{report.totalReservations}</td>
