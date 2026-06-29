@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,8 +15,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import Link from "next/link";
-import { ArrowLeft, MapPin, DollarSign, Home, Settings } from "lucide-react";
+import {
+  ArrowLeft,
+  MapPin,
+  DollarSign,
+  Home,
+  Settings,
+  Upload,
+  X,
+  Image,
+  Loader2,
+} from "lucide-react";
 import { propertyService } from "@/lib/services/property.service";
+import { uploadService } from "@/lib/services/upload.service";
 import { PropertyStatus, PropertyType } from "@/types/api-responses";
 
 const propertyTypes: { value: PropertyType; label: string }[] = [
@@ -46,6 +57,13 @@ export default function EditPropertyPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [existingPhotos, setExistingPhotos] = useState<string[]>([]);
+  const [newPhotos, setNewPhotos] = useState<
+    { url: string; publicId: string }[]
+  >([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -71,6 +89,7 @@ export default function EditPropertyPage() {
       try {
         const res = await propertyService.getById(id);
         const p = res.data;
+        setExistingPhotos(p.photoUrls ?? []);
         setFormData({
           title: p.title,
           description: p.description ?? "",
@@ -102,13 +121,41 @@ export default function EditPropertyPage() {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    if (!files.length) return;
+    setUploadError(null);
+    setIsUploading(true);
+    const results = await Promise.allSettled(
+      files.map((f) => uploadService.uploadImage(f)),
+    );
+    const uploaded: { url: string; publicId: string }[] = [];
+    const errors: string[] = [];
+    results.forEach((result, i) => {
+      if (result.status === "fulfilled") {
+        uploaded.push({
+          url: result.value.data.url,
+          publicId: result.value.data.publicId,
+        });
+      } else {
+        errors.push(
+          `${files[i].name}: ${(result.reason as Error)?.message ?? "Error al subir"}`,
+        );
+      }
+    });
+    setNewPhotos((prev) => [...prev, ...uploaded]);
+    if (errors.length > 0) setUploadError(errors.join(", "));
+    setIsUploading(false);
+    e.target.value = "";
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSaving(true);
     try {
       await propertyService.update(id, {
         title: formData.title || undefined,
-        description: formData.description || undefined,
+        description: formData.description,
         address: formData.address || undefined,
         city: formData.city || undefined,
         department: formData.department || undefined,
@@ -131,9 +178,13 @@ export default function EditPropertyPage() {
           : undefined,
         areaSqm: formData.areaSqm ? parseFloat(formData.areaSqm) : undefined,
         propertyType: (formData.propertyType as PropertyType) || undefined,
-        propertyStatus: (formData.propertyStatus as PropertyStatus) || undefined,
+        propertyStatus:
+          (formData.propertyStatus as PropertyStatus) || undefined,
         rules: formData.rules || undefined,
       });
+      if (newPhotos.length > 0) {
+        await propertyService.attachPhotos(id, { photoUrls: newPhotos });
+      }
       router.push(`/propietario/propiedades/${id}`);
     } catch (err) {
       console.error("Error updating property:", err);
@@ -279,9 +330,7 @@ export default function EditPropertyPage() {
                   type="number"
                   min="0"
                   value={formData.areaSqm}
-                  onChange={(e) =>
-                    handleInputChange("areaSqm", e.target.value)
-                  }
+                  onChange={(e) => handleInputChange("areaSqm", e.target.value)}
                   className="bg-input"
                 />
               </div>
@@ -442,6 +491,82 @@ export default function EditPropertyPage() {
           </CardContent>
         </Card>
 
+        {/* Photos */}
+        <Card className="border-t-4 border-t-primary">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Image className="w-5 h-5 text-primary" />
+              Fotos
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              className="hidden"
+              onChange={handleFileChange}
+            />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {existingPhotos.map((url, index) => (
+                <div key={`existing-${index}`} className="relative">
+                  <img
+                    src={url}
+                    alt={`Foto ${index + 1}`}
+                    className="w-full h-32 object-cover rounded-lg opacity-80"
+                  />
+                </div>
+              ))}
+              {newPhotos.map((photo, index) => (
+                <div key={`new-${index}`} className="relative group">
+                  <img
+                    src={photo.url}
+                    alt={`Nueva foto ${index + 1}`}
+                    className="w-full h-32 object-cover rounded-lg"
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setNewPhotos((prev) => prev.filter((_, i) => i !== index))
+                    }
+                    className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                disabled={isUploading}
+                onClick={() => fileInputRef.current?.click()}
+                className="h-32 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-primary hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isUploading ? (
+                  <>
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                    <span className="text-sm">Subiendo...</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-6 h-6" />
+                    <span className="text-sm">Agregar fotos</span>
+                  </>
+                )}
+              </button>
+            </div>
+            {uploadError && (
+              <p className="text-sm text-destructive">{uploadError}</p>
+            )}
+            {existingPhotos.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Las fotos existentes se muestran en gris. Las nuevas fotos se
+                agregarán al guardar.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Rules */}
         <Card className="border-t-4 border-t-primary">
           <CardHeader>
@@ -473,7 +598,7 @@ export default function EditPropertyPage() {
           <Button
             type="submit"
             className="bg-primary hover:bg-primary/90"
-            disabled={isSaving}
+            disabled={isSaving || isUploading}
           >
             {isSaving ? "Guardando..." : "Guardar Cambios"}
           </Button>
