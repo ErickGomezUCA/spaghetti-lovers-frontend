@@ -13,13 +13,39 @@ export const accessCodeService = {
             `/reservations/${reservationId}/access-code`,
         ),
 
-    getTenantAccessCodes: (): Promise<ApiResponse<AccessCodeDetailResponse[]>> =>
-        apiClient.get<ApiResponse<AccessCodeDetailResponse[]>>(
-            "/access-codes/tenant",
-        ),
+    getTenantAccessCodes: (
+        page: number = 0,
+        pageSize: number = 10,
+        sortBy: string = "validFrom",
+        sortOrder: string = "desc",
+    ): Promise<ApiResponse<AccessCodeDetailResponse[]>> => {
+        const params = new URLSearchParams({
+            page: page.toString(),
+            pageSize: pageSize.toString(),
+            sortBy,
+            sortOrder,
+        })
 
-    getLandlordAccessCodes: (): Promise<ApiResponse<AccessCodeDetailResponse[]>> =>
-        apiClient.get<ApiResponse<AccessCodeDetailResponse[]>>(
-            "/access-codes/landlord",
-        ),
+        return apiClient.get<ApiResponse<AccessCodeDetailResponse[]>>(
+            `/access-codes/tenant?${params.toString()}`,
+        )
+    },
+
+    getLandlordAccessCodes: (
+        page: number = 0,
+        pageSize: number = 10,
+        sortBy: string = "validFrom",
+        sortOrder: string = "desc",
+    ): Promise<ApiResponse<AccessCodeDetailResponse[]>> => {
+        const params = new URLSearchParams({
+            page: page.toString(),
+            pageSize: pageSize.toString(),
+            sortBy,
+            sortOrder,
+        })
+
+        return apiClient.get<ApiResponse<AccessCodeDetailResponse[]>>(
+            `/access-codes/landlord?${params.toString()}`,
+        )
+    },
 };

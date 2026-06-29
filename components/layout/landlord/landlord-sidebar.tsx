@@ -13,7 +13,6 @@ import {
   BarChart3,
   Bell,
   User,
-  Settings,
   LogOut,
   Key,
   DollarSign,
@@ -64,11 +63,6 @@ const landlordSections = [
     title: "Mi cuenta",
     items: [
       { href: "/propietario/perfil", label: "Mi Perfil", icon: User },
-      {
-        href: "/propietario/configuracion",
-        label: "Configuración",
-        icon: Settings,
-      },
     ],
   },
 ];
@@ -78,7 +72,7 @@ export function LandlordSidebar() {
   const { logout } = useAuth();
 
   return (
-    <aside className="flex flex-col w-64 min-h-screen bg-card border-r border-border">
+    <aside className="flex flex-col w-64 sticky top-0 h-screen bg-card border-r border-border overflow-y-auto">
       {/* Logo */}
       <div className="flex items-center gap-3 px-6 py-5 border-b border-border">
         <div className="flex items-center justify-center w-10 h-10 rounded-lg border border-border bg-background">

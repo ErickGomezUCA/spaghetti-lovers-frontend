@@ -250,8 +250,9 @@ export default function PropertiesPage() {
                     >
                       <Edit className="w-4 h-4 mr-2" /> Editar
                     </DropdownMenuItem>
-                    <DropdownMenuItem>
-                      {/* TODO: Navigate to calendar for this property */}
+                    <DropdownMenuItem
+                      onClick={() => router.push(`/propietario/calendario?propertyId=${property.id}`)}
+                    >
                       <Calendar className="w-4 h-4 mr-2" /> Ver calendario
                     </DropdownMenuItem>
                     <DropdownMenuItem

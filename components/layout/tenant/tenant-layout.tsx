@@ -21,7 +21,7 @@ export function TenantLayout({ children }: TenantLayoutProps) {
 
       <div className="flex">
         {/* Desktop Sidebar */}
-        <TenantSidebar className="hidden w-64 shrink-0 border-r border-border bg-card lg:flex" />
+        <TenantSidebar className="hidden w-64 shrink-0 border-r border-border bg-card lg:flex sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto" />
 
         {/* Mobile Sidebar Overlay */}
         {isMobileMenuOpen && (

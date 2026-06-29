@@ -1,359 +1,459 @@
 "use client"
 
-import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import {
-  Search,
-  Plus,
-  AlertTriangle,
-  DollarSign,
-  Eye,
-  CheckCircle,
-  Clock,
-  Volume2,
-  Home,
-  CreditCard,
-} from "lucide-react"
+import { useState, useEffect, useCallback } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { AlertTriangle, Plus, Search, Eye, Loader2, ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react'
 
-// Mock data
-const fines = [
-  {
-    id: "FIN-001",
-    reservationId: "RES-001",
-    property: "Apartamento Centro Histórico",
-    tenant: "María García",
-    tenantEmail: "maria@email.com",
-    fineType: "noise_violation",
-    description: "Quejas de vecinos por ruido excesivo después de las 10 PM",
-    amount: 50,
-    issuedAt: "2024-06-17",
-    resolvedAt: null,
-    paymentId: "PAY-010",
-    paymentMethod: null,
-  },
-  {
-    id: "FIN-002",
-    reservationId: "RES-003",
-    property: "Loft Moderno Zona Rosa",
-    tenant: "Ana Martínez",
-    tenantEmail: "ana@email.com",
-    fineType: "late_checkout",
-    description: "Checkout 3 horas después de la hora acordada",
-    amount: 75,
-    issuedAt: "2024-05-30",
-    resolvedAt: "2024-06-01",
-    paymentId: "PAY-011",
-    paymentMethod: "card",
-  },
-  {
-    id: "FIN-003",
-    reservationId: "RES-002",
-    property: "Casa de Playa Costa del Sol",
-    tenant: "Carlos López",
-    tenantEmail: "carlos@email.com",
-    fineType: "property_damage",
-    description: "Daño en mesa de vidrio del comedor",
-    amount: 200,
-    issuedAt: "2024-06-20",
-    resolvedAt: null,
-    paymentId: "PAY-012",
-    paymentMethod: null,
-  },
-]
+import { fineService } from '@/lib/services/fine.service'
+import { reservationService } from '@/lib/services/reservation.service'
 
 const fineTypeLabels: Record<string, string> = {
-  property_damage: "Daño a propiedad",
-  noise_violation: "Violación de ruido",
-  late_checkout: "Checkout tardío",
-  late_payment: "Pago tardío",
+  PROPERTY_DAMAGE: 'Daños a la propiedad',
+  NOISE_VIOLATION: 'Ruido',
+  LATE_CHECKOUT: 'Check-out tardío',
+  LATE_PAYMENT: 'Pago tardío',
 }
 
 const fineTypeColors: Record<string, string> = {
-  property_damage: "bg-red-100 text-red-700 border-red-200",
-  noise_violation: "bg-orange-100 text-orange-700 border-orange-200",
-  late_checkout: "bg-yellow-100 text-yellow-700 border-yellow-200",
-  late_payment: "bg-purple-100 text-purple-700 border-purple-200",
+  PROPERTY_DAMAGE: 'bg-red-100 text-red-800',
+  NOISE_VIOLATION: 'bg-orange-100 text-orange-800',
+  LATE_CHECKOUT: 'bg-amber-100 text-amber-800',
+  LATE_PAYMENT: 'bg-blue-100 text-blue-800',
 }
 
-const fineTypeIcons: Record<string, React.ReactNode> = {
-  property_damage: <Home className="w-4 h-4" />,
-  noise_violation: <Volume2 className="w-4 h-4" />,
-  late_checkout: <Clock className="w-4 h-4" />,
-  late_payment: <CreditCard className="w-4 h-4" />,
-}
+export default function LandlordFinesPage() {
+  const [fines, setFines] = useState<any[]>([])
+  const [summary, setSummary] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
-export default function FinesPage() {
+  const [currentPage, setCurrentPage] = useState(0)
+  const [paginationInfo, setPaginationInfo] = useState<any>(null)
   const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [typeFilter, setTypeFilter] = useState("all")
-  const [isNewFineOpen, setIsNewFineOpen] = useState(false)
+  const [statusFilter, setStatusFilter] = useState<string>("ALL")
+  const [typeFilter, setTypeFilter] = useState<string>("ALL")
+  const pageSize = 15
 
-  const filteredFines = fines.filter((fine) => {
-    const matchesSearch =
-      fine.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      fine.property.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      fine.tenant.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = statusFilter === "all" || 
-      (statusFilter === "pending" && !fine.resolvedAt) ||
-      (statusFilter === "resolved" && fine.resolvedAt)
-    const matchesType = typeFilter === "all" || fine.fineType === typeFilter
-    return matchesSearch && matchesStatus && matchesType
-  })
+  const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [showViewDialog, setShowViewDialog] = useState(false)
+  const [selectedFine, setSelectedFine] = useState<any | null>(null)
 
-  const totalPending = fines.filter((f) => !f.resolvedAt).reduce((sum, f) => sum + f.amount, 0)
-  const totalResolved = fines.filter((f) => f.resolvedAt).reduce((sum, f) => sum + f.amount, 0)
+  const [reservationsForSelect, setReservationsForSelect] = useState<any[]>([])
+  const [newFine, setNewFine] = useState({ reservationId: '', fineType: '', amount: '', description: '' })
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
+
+  const fetchSummary = useCallback(async () => {
+    try {
+      const res = await fineService.getLandlordSummary()
+      setSummary(res.data)
+    } catch (error) {
+      console.error('Error cargando resumen:', error)
+    }
+  }, [])
+
+  const fetchFines = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const res = await fineService.getLandlordFines(currentPage, pageSize, typeFilter, statusFilter, searchTerm)
+      setFines(res.data || [])
+      setPaginationInfo(res.pagination || res.paginationMeta || null)
+    } catch (error) {
+      console.error('Error cargando multas:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [currentPage, pageSize, typeFilter, statusFilter, searchTerm])
+
+  useEffect(() => {
+    fetchSummary()
+  }, [fetchSummary])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchFines()
+    }, 300) 
+    return () => clearTimeout(timer)
+  }, [fetchFines])
+
+  const fetchReservationsForDropdown = async () => {
+    try {
+      const res = await reservationService.getLandlordReservations(0, 50)
+      setReservationsForSelect(res.data || [])
+    } catch (error) {
+      console.error("Error cargando reservas para el select", error)
+    }
+  }
+
+  const handleOpenCreateModal = () => {
+    setNewFine({ reservationId: '', fineType: '', amount: '', description: '' })
+    setFormError(null)
+    fetchReservationsForDropdown()
+    setShowCreateDialog(true)
+  }
+
+  const handleCreateFine = async () => {
+    if (!newFine.reservationId || !newFine.fineType || !newFine.amount || !newFine.description) {
+      setFormError("Por favor completa todos los campos.")
+      return
+    }
+    setIsSubmitting(true)
+    setFormError(null)
+    try {
+      await fineService.createFine({
+        reservationId: newFine.reservationId,
+        fineType: newFine.fineType,
+        amount: parseFloat(newFine.amount),
+        description: newFine.description
+      })
+      setShowCreateDialog(false)
+      fetchSummary()
+      fetchFines()
+    } catch (error: any) {
+      setFormError(error?.response?.data?.message || "Ocurrió un error al emitir la multa. Verifica el estado de la reserva.")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const openViewDialog = (fine: any) => {
+    setSelectedFine(fine)
+    setShowViewDialog(true)
+  }
+
+  const totalPages = paginationInfo?.totalPages ?? 1
+  const hasNext = currentPage < totalPages - 1
+  const hasPrev = currentPage > 0
 
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Multas</h1>
-          <p className="text-muted-foreground">Gestiona las multas emitidas a inquilinos</p>
+          <h1 className="text-2xl font-bold text-foreground">Multas</h1>
+          <p className="text-muted-foreground mt-1">Gestiona las multas emitidas a inquilinos</p>
         </div>
-        <Dialog open={isNewFineOpen} onOpenChange={setIsNewFineOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-primary hover:bg-primary/90">
-              <Plus className="w-4 h-4 mr-2" />
-              Emitir Multa
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Emitir Nueva Multa</DialogTitle>
-            </DialogHeader>
-            <form className="space-y-4">
-              <div className="space-y-2">
-                <Label className="text-xs uppercase text-muted-foreground font-medium">Reserva</Label>
-                <Select>
-                  <SelectTrigger className="bg-input">
-                    <SelectValue placeholder="Selecciona una reserva activa" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="RES-001">RES-001 - María García (Apartamento Centro)</SelectItem>
-                    <SelectItem value="RES-002">RES-002 - Carlos López (Casa Playa)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs uppercase text-muted-foreground font-medium">Tipo de Multa</Label>
-                <Select>
-                  <SelectTrigger className="bg-input">
-                    <SelectValue placeholder="Selecciona el tipo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="property_damage">Daño a propiedad</SelectItem>
-                    <SelectItem value="noise_violation">Violación de ruido</SelectItem>
-                    <SelectItem value="late_checkout">Checkout tardío</SelectItem>
-                    <SelectItem value="late_payment">Pago tardío</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs uppercase text-muted-foreground font-medium">Monto (USD)</Label>
-                <Input type="number" min="0" step="0.01" placeholder="0.00" className="bg-input" />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs uppercase text-muted-foreground font-medium">Descripción</Label>
-                <Textarea 
-                  placeholder="Describe el motivo de la multa con detalle..." 
-                  rows={3} 
-                  className="bg-input" 
-                />
-              </div>
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                <div className="flex items-start gap-2">
-                  <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5" />
-                  <div className="text-sm">
-                    <p className="font-medium text-yellow-800">Importante</p>
-                    <p className="text-yellow-600">
-                      El inquilino recibirá una notificación sobre esta multa y deberá pagarla.
-                      Si el monto supera el depósito de garantía, se generará un pago pendiente.
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="flex gap-2 pt-2">
-                <Button type="button" variant="outline" className="flex-1" onClick={() => setIsNewFineOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button type="submit" className="flex-1 bg-primary">
-                  Emitir Multa
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <Button onClick={handleOpenCreateModal} className="bg-destructive hover:bg-destructive/90 text-white">
+          <Plus className="w-4 h-4 mr-2" /> Emitir Multa
+        </Button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="border-t-4 border-t-primary">
-          <CardContent className="p-4 text-center">
-            <p className="text-2xl font-semibold">{fines.length}</p>
-            <p className="text-sm text-muted-foreground">Total multas</p>
-          </CardContent>
-        </Card>
-        <Card className="border-t-4 border-t-yellow-500">
-          <CardContent className="p-4 text-center">
-            <p className="text-2xl font-semibold text-yellow-600">
-              {fines.filter((f) => !f.resolvedAt).length}
+      {/* Cards de Estadísticas */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card className="border-t-4 border-t-slate-800">
+          <CardContent className="pt-6 text-center">
+            <p className="text-3xl font-bold text-foreground">
+              {summary ? summary.totalFines : <Loader2 className="w-6 h-6 animate-spin mx-auto" />}
             </p>
-            <p className="text-sm text-muted-foreground">Pendientes</p>
+            <p className="text-sm text-muted-foreground mt-1">Total multas</p>
           </CardContent>
         </Card>
-        <Card className="border-t-4 border-t-red-500">
-          <CardContent className="p-4 text-center">
-            <p className="text-2xl font-semibold text-red-600">${totalPending.toFixed(2)}</p>
-            <p className="text-sm text-muted-foreground">Por cobrar</p>
+        <Card className="border-t-4 border-t-amber-500">
+          <CardContent className="pt-6 text-center">
+            <p className="text-3xl font-bold text-amber-600">
+              {summary ? summary.pendingCount : <Loader2 className="w-6 h-6 animate-spin mx-auto" />}
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">Pendientes</p>
+          </CardContent>
+        </Card>
+        <Card className="border-t-4 border-t-destructive">
+          <CardContent className="pt-6 text-center">
+            <p className="text-3xl font-bold text-destructive">
+              {summary ? `$${summary.pendingAmount?.toFixed(2)}` : <Loader2 className="w-6 h-6 animate-spin mx-auto" />}
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">Por cobrar</p>
           </CardContent>
         </Card>
         <Card className="border-t-4 border-t-green-500">
-          <CardContent className="p-4 text-center">
-            <p className="text-2xl font-semibold text-green-600">${totalResolved.toFixed(2)}</p>
-            <p className="text-sm text-muted-foreground">Cobradas</p>
+          <CardContent className="pt-6 text-center">
+            <p className="text-3xl font-bold text-green-600">
+              {summary ? `$${summary.resolvedAmount?.toFixed(2)}` : <Loader2 className="w-6 h-6 animate-spin mx-auto" />}
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">Cobradas</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Filters */}
-      <Card className="border-t-4 border-t-primary">
+      {/* Barra de Filtros */}
+      <Card>
         <CardContent className="p-4">
           <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1 relative">
+            <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 placeholder="Buscar por ID, propiedad o inquilino..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 bg-input"
+                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(0); }}
+                className="pl-10 bg-muted/50"
               />
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full md:w-40 bg-input">
-                <SelectValue placeholder="Estado" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="pending">Pendientes</SelectItem>
-                <SelectItem value="resolved">Pagadas</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-full md:w-48 bg-input">
-                <SelectValue placeholder="Tipo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los tipos</SelectItem>
-                <SelectItem value="property_damage">Daño a propiedad</SelectItem>
-                <SelectItem value="noise_violation">Violación de ruido</SelectItem>
-                <SelectItem value="late_checkout">Checkout tardío</SelectItem>
-                <SelectItem value="late_payment">Pago tardío</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex gap-2">
+              <Select value={statusFilter} onValueChange={(val) => { setStatusFilter(val); setCurrentPage(0); }}>
+                <SelectTrigger className="w-[150px] bg-muted/50">
+                  <SelectValue placeholder="Estado" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Todos los estados</SelectItem>
+                  <SelectItem value="false">Pendientes</SelectItem>
+                  <SelectItem value="true">Cobradas</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={typeFilter} onValueChange={(val) => { setTypeFilter(val); setCurrentPage(0); }}>
+                <SelectTrigger className="w-[180px] bg-muted/50">
+                  <SelectValue placeholder="Tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Todos los tipos</SelectItem>
+                  <SelectItem value="PROPERTY_DAMAGE">Daños a propiedad</SelectItem>
+                  <SelectItem value="NOISE_VIOLATION">Ruido</SelectItem>
+                  <SelectItem value="LATE_CHECKOUT">Check-out tardío</SelectItem>
+                  <SelectItem value="LATE_PAYMENT">Pago tardío</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Fines Table */}
-      <Card className="border-t-4 border-t-primary">
+      {/* Tabla de Multas (Con overflow-x-auto para que sea responsive) */}
+      <Card>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>ID</TableHead>
-                <TableHead>Reserva</TableHead>
-                <TableHead>Inquilino</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Descripción</TableHead>
-                <TableHead>Monto</TableHead>
-                <TableHead>Fecha</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredFines.map((fine) => (
-                <TableRow key={fine.id}>
-                  <TableCell className="font-medium">{fine.id}</TableCell>
-                  <TableCell>{fine.reservationId}</TableCell>
-                  <TableCell>
-                    <div>
-                      <p className="font-medium">{fine.tenant}</p>
-                      <p className="text-xs text-muted-foreground">{fine.tenantEmail}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={fineTypeColors[fine.fineType]}>
-                      <span className="flex items-center gap-1">
-                        {fineTypeIcons[fine.fineType]}
-                        {fineTypeLabels[fine.fineType]}
-                      </span>
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="max-w-[200px] truncate">{fine.description}</TableCell>
-                  <TableCell>
-                    <span className="flex items-center gap-1 font-semibold">
-                      <DollarSign className="w-4 h-4" />
-                      {fine.amount.toFixed(2)}
-                    </span>
-                  </TableCell>
-                  <TableCell>{fine.issuedAt}</TableCell>
-                  <TableCell>
-                    {fine.resolvedAt ? (
-                      <Badge className="bg-green-100 text-green-700">
-                        <span className="flex items-center gap-1">
-                          <CheckCircle className="w-3 h-3" />
-                          Pagada
-                        </span>
-                      </Badge>
-                    ) : (
-                      <Badge className="bg-yellow-100 text-yellow-700">
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          Pendiente
-                        </span>
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Button variant="ghost" size="icon">
-                      <Eye className="w-4 h-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <div className="overflow-x-auto w-full">
+            <table className="w-full text-sm text-left">
+              <thead className="text-xs text-muted-foreground uppercase bg-muted/30 border-b">
+                <tr>
+                  <th className="px-6 py-4 font-medium">ID</th>
+                  <th className="px-6 py-4 font-medium">Reserva</th>
+                  <th className="px-6 py-4 font-medium">Inquilino</th>
+                  <th className="px-6 py-4 font-medium">Tipo</th>
+                  <th className="px-6 py-4 font-medium">Descripción</th>
+                  <th className="px-6 py-4 font-medium">Monto</th>
+                  <th className="px-6 py-4 font-medium">Fecha</th>
+                  <th className="px-6 py-4 font-medium">Estado</th>
+                  <th className="px-6 py-4 font-medium text-center">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={9} className="px-6 py-12 text-center">
+                      <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
+                    </td>
+                  </tr>
+                ) : fines.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="px-6 py-12 text-center text-muted-foreground">
+                      No se encontraron multas con estos filtros.
+                    </td>
+                  </tr>
+                ) : (
+                  fines.map((fine) => (
+                    <tr key={fine.fineId} className="hover:bg-muted/30 transition-colors">
+                      <td className="px-6 py-4 font-medium">
+                        {fine.fineId.split('-')[0].toUpperCase()}
+                      </td>
+                      <td className="px-6 py-4 text-muted-foreground">
+                        {fine.reservationId.split('-')[0].toUpperCase()}
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="font-medium">{fine.tenantName}</p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <Badge variant="outline" className={`border-none ${fineTypeColors[fine.fineType] || 'bg-gray-100 text-gray-800'}`}>
+                          {fineTypeLabels[fine.fineType] || fine.fineType}
+                        </Badge>
+                      </td>
+                      <td className="px-6 py-4 max-w-[200px] truncate" title={fine.description}>
+                        {fine.description}
+                      </td>
+                      <td className="px-6 py-4 font-bold">
+                        ${fine.amount.toFixed(2)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-muted-foreground">
+                        {new Date(fine.issuedAt).toLocaleDateString('es-ES')}
+                      </td>
+                      <td className="px-6 py-4">
+                        {fine.resolvedAt ? (
+                          <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-none">Pagada</Badge>
+                        ) : (
+                          <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-none">Pendiente</Badge>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <Button variant="ghost" size="icon" className="bg-destructive/10 text-destructive hover:bg-destructive hover:text-white" onClick={() => openViewDialog(fine)}>
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Paginación */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-6 py-4 border-t bg-muted/10">
+              <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(0, p - 1))} disabled={!hasPrev || isLoading}>
+                <ChevronLeft className="w-4 h-4 mr-1" /> Anterior
+              </Button>
+              <span className="text-sm font-medium text-muted-foreground">
+                Página {currentPage + 1} de {totalPages}
+              </span>
+              <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => p + 1)} disabled={!hasNext || isLoading}>
+                Siguiente <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {/* MODAL: EMITIR MULTA */}
+      <Dialog open={showCreateDialog} onOpenChange={(open) => { setShowCreateDialog(open); if(!open) setFormError(null) }}>
+        <DialogContent className="max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Emitir Nueva Multa</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Reserva</Label>
+              <Select value={newFine.reservationId} onValueChange={(val) => setNewFine({...newFine, reservationId: val})}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona la reserva..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {reservationsForSelect.map(r => (
+                    <SelectItem key={r.id} value={r.id}>
+                      RES-{r.id.split('-')[0].toUpperCase()} - {r.tenantName} ({r.propertyName})
+                    </SelectItem>
+                  ))}
+                  {reservationsForSelect.length === 0 && (
+                    <SelectItem value="empty" disabled>Cargando reservas...</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Tipo de Multa</Label>
+              <Select value={newFine.fineType} onValueChange={(val) => setNewFine({...newFine, fineType: val})}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona el tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PROPERTY_DAMAGE">Daños a la propiedad</SelectItem>
+                  <SelectItem value="NOISE_VIOLATION">Violación de ruido</SelectItem>
+                  <SelectItem value="LATE_CHECKOUT">Check-out tardío</SelectItem>
+                  <SelectItem value="LATE_PAYMENT">Pago tardío</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Monto (USD)</Label>
+              <Input 
+                type="number" 
+                placeholder="0.00" 
+                value={newFine.amount}
+                onChange={(e) => setNewFine({...newFine, amount: e.target.value})}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Descripción</Label>
+              <Textarea 
+                placeholder="Describe el motivo de la multa con detalle..." 
+                rows={3}
+                value={newFine.description}
+                onChange={(e) => setNewFine({...newFine, description: e.target.value})}
+              />
+            </div>
+
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 flex gap-3 items-start mt-2">
+               <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+               <p className="text-sm text-amber-800">
+                 <strong>Importante:</strong> El inquilino recibirá una notificación sobre esta multa y deberá pagarla. Si es daño a la propiedad, se priorizará cobrarla del depósito de garantía al finalizar.
+               </p>
+            </div>
+
+            {formError && (
+              <div className="text-sm text-destructive bg-destructive/10 p-2 rounded border border-destructive/20">
+                {formError}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreateDialog(false)} disabled={isSubmitting}>Cancelar</Button>
+            <Button className="bg-destructive hover:bg-destructive/90 text-white" onClick={handleCreateFine} disabled={isSubmitting}>
+              {isSubmitting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin"/> Emitiendo...</> : "Emitir Multa"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL: VER DETALLE (Botón del Ojito) */}
+      <Dialog open={showViewDialog} onOpenChange={setShowViewDialog}>
+        <DialogContent className="max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle>Detalle de la Multa</DialogTitle>
+          </DialogHeader>
+          {selectedFine && (
+            <div className="space-y-4 py-2">
+              <div className="flex justify-between items-center border-b pb-3">
+                <span className="text-muted-foreground text-sm">ID de Multa</span>
+                <span className="font-mono font-medium">{selectedFine.fineId.toUpperCase()}</span>
+              </div>
+              <div className="flex justify-between items-center border-b pb-3">
+                <span className="text-muted-foreground text-sm">Inquilino</span>
+                <span className="font-medium">{selectedFine.tenantName}</span>
+              </div>
+              <div className="flex justify-between items-center border-b pb-3">
+                <span className="text-muted-foreground text-sm">Propiedad</span>
+                <span className="font-medium text-right max-w-[200px] truncate" title={selectedFine.propertyName}>
+                  {selectedFine.propertyName}
+                </span>
+              </div>
+              <div className="flex justify-between items-center border-b pb-3">
+                <span className="text-muted-foreground text-sm">Fecha de Emisión</span>
+                <span className="font-medium">{new Date(selectedFine.issuedAt).toLocaleDateString('es-ES')}</span>
+              </div>
+              <div className="flex justify-between items-center border-b pb-3">
+                <span className="text-muted-foreground text-sm">Estado</span>
+                {selectedFine.resolvedAt ? (
+                  <Badge className="bg-green-100 text-green-700 border-none">
+                    Pagada ({new Date(selectedFine.resolvedAt).toLocaleDateString('es-ES')})
+                  </Badge>
+                ) : (
+                  <Badge className="bg-amber-100 text-amber-700 border-none">Pendiente</Badge>
+                )}
+              </div>
+              
+              <div className="bg-muted/30 p-3 rounded-lg space-y-2 mt-4">
+                <p className="text-xs text-muted-foreground font-semibold uppercase">Motivo</p>
+                <Badge variant="outline" className={`border-none ${fineTypeColors[selectedFine.fineType]}`}>
+                  {fineTypeLabels[selectedFine.fineType]}
+                </Badge>
+                <p className="text-sm mt-2 leading-relaxed">{selectedFine.description}</p>
+              </div>
+
+              <div className="flex justify-between items-center pt-2">
+                <span className="font-bold text-lg">Monto Total</span>
+                <span className="font-bold text-2xl text-destructive">${selectedFine.amount.toFixed(2)}</span>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowViewDialog(false)}>Cerrar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -1,5 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { notificationService } from "@/lib/services/notification.service";
+import { NotificationResponse } from "@/types/api-responses";
 import { Home, Bell, User, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,7 +14,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
-import { mockNotifications } from "@/lib/mock-data";
 import { useAuth } from "@/lib/contexts/auth-context";
 
 interface TenantHeaderProps {
@@ -24,11 +26,43 @@ export function TenantHeader({
   isMobileMenuOpen,
 }: TenantHeaderProps) {
   const { logout, user } = useAuth();
-  const unreadCount = mockNotifications.filter((n) => !n.read).length;
+  const [notifications, setNotifications] = useState<NotificationResponse[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const handleLogout = () => {
     logout();
   };
+
+  const fetchHeaderNotifications = async () => {
+        try {
+            const [notificationsResponse, unreadCountResponse] = await Promise.all([
+                notificationService.getNotifications(),
+                notificationService.getUnreadCount(),
+            ]);
+
+            setNotifications((notificationsResponse.data || []).slice(0, 4));
+            setUnreadCount(unreadCountResponse.data || 0);
+        } catch (error) {
+            console.error("Error loading tenant header notifications:", error);
+        }
+    };
+
+    useEffect(() => {
+        fetchHeaderNotifications();
+
+        const handleNotificationsUpdated = () => {
+            fetchHeaderNotifications();
+        };
+
+        window.addEventListener("notifications-updated", handleNotificationsUpdated);
+
+        return () => {
+            window.removeEventListener(
+                "notifications-updated",
+                handleNotificationsUpdated,
+            );
+        };
+    }, []);
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-card">
@@ -82,22 +116,33 @@ export function TenantHeader({
                 <h3 className="font-semibold">Notificaciones</h3>
               </div>
               <DropdownMenuSeparator />
-              {mockNotifications.slice(0, 4).map((notif) => (
-                <DropdownMenuItem
-                  key={notif.id}
-                  className="flex flex-col items-start gap-1 p-3"
-                >
-                  <div className="flex items-center gap-2">
-                    {!notif.read && (
-                      <span className="h-2 w-2 rounded-full bg-primary" />
-                    )}
-                    <span className="font-medium">{notif.title}</span>
-                  </div>
-                  <span className="text-xs text-muted-foreground line-clamp-2">
-                    {notif.message}
-                  </span>
-                </DropdownMenuItem>
-              ))}
+              {notifications.length === 0 ? (
+                  <DropdownMenuItem className="flex flex-col items-center gap-1 p-4 text-center">
+    <span className="text-sm font-medium text-muted-foreground">
+      No tienes notificaciones
+    </span>
+                      <span className="text-xs text-muted-foreground">
+      Las notificaciones aparecerán aquí
+    </span>
+                  </DropdownMenuItem>
+              ) : (
+                  notifications.map((notif) => (
+                      <DropdownMenuItem
+                          key={notif.id}
+                          className="flex flex-col items-start gap-1 p-3"
+                      >
+                          <div className="flex items-center gap-2">
+                              {!notif.isRead && (
+                                  <span className="h-2 w-2 rounded-full bg-primary" />
+                              )}
+                              <span className="font-medium">{notif.title}</span>
+                          </div>
+                          <span className="text-xs text-muted-foreground line-clamp-2">
+        {notif.message}
+      </span>
+                      </DropdownMenuItem>
+                  ))
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
                 <Link

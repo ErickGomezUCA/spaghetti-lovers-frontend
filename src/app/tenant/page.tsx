@@ -1,61 +1,126 @@
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { useState, useEffect } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { CalendarDays, FileText, Key, Wrench, Star, ArrowRight, Home, Clock, Loader2, DollarSign, Users, Bell } from 'lucide-react'
+import Link from 'next/link'
+import { useAuth } from '@/lib/contexts/auth-context'
+import { reservationService } from '@/lib/services/reservation.service'
 import {
-  CalendarDays,
-  FileText,
-  Key,
-  Wrench,
-  Star,
-  ArrowRight,
-  Home,
-  Clock,
-} from "lucide-react";
-import Link from "next/link";
-import { useAuth } from "@/lib/contexts/auth-context";
-import {
-  mockReservations,
-  mockContracts,
-  mockMaintenanceRequests,
-  mockNotifications,
-} from "@/lib/mock-data";
+    ReservationResponse,
+    NotificationResponse,
+} from '@/types/api-responses'
+import { notificationService } from '@/lib/services/notification.service'
+import { ratingService } from '@/lib/services/rating.service'
+import { contractService } from '@/lib/services/contract.service'
+import { maintenanceService } from '@/lib/services/maintenance.service'
 
-const statusColors = {
-  reserved: "bg-blue-100 text-blue-800",
-  active: "bg-green-100 text-green-800",
-  completed: "bg-gray-100 text-gray-800",
-  cancelled: "bg-red-100 text-red-800",
+const formatShortDate = (dateString: string) => {
+  if (!dateString) return "";
+  const [year, month, day] = dateString.split('-');
+  const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+  const monthName = date.toLocaleDateString('es-ES', { month: 'short' });
+  const cleanMonth = monthName.replace('.', '');
+  const capitalizedMonth = cleanMonth.charAt(0).toUpperCase() + cleanMonth.slice(1);
+  return `${day} ${capitalizedMonth}`;
 };
 
-const statusLabels = {
-  reserved: "Reservada",
-  active: "Activa",
-  completed: "Completada",
-  cancelled: "Cancelada",
+const getStatusBadgeConfig = (status: string) => {
+  switch (status) {
+    case "ACTIVE":
+      return { label: "Activa", className: "bg-green-100 text-green-800 border-transparent" };
+    case "CANCELLED":
+      return { label: "Cancelada", className: "bg-red-100 text-red-800 border-transparent" };
+    case "COMPLETED":
+      return { label: "Completada", className: "bg-gray-100 text-gray-800 border-transparent" };
+    case "RESERVED":
+    default:
+      return { label: "Reservada", className: "bg-blue-100 text-blue-800 border-transparent" };
+  }
 };
+
+const displayNotificationTitle = (title: string) => {
+    const translations: Record<string, string> = {
+        "Reservation Cancelled": "Reserva cancelada",
+        "New Reservation": "Nueva reserva",
+    }
+
+    return translations[title] ?? title
+}
+
+const displayNotificationMessage = (message: string) => {
+    const translations: Record<string, string> = {
+        "The reservation has been cancelled.": "La reserva ha sido cancelada.",
+        "You have a new reservation for your property.":
+            "Tienes una nueva reserva para una de tus propiedades.",
+    }
+
+    return translations[message] ?? message
+}
 
 export default function TenantDashboard() {
-  const { user } = useAuth();
-  const activeReservations = mockReservations.filter(
-    (r) =>
-      r.reservationStatus === "active" || r.reservationStatus === "reserved",
-  );
-  const pendingContracts = mockContracts.filter(
-    (c) => c.contractStatus === "pending_signatures",
-  );
-  const activeMaintenanceRequests = mockMaintenanceRequests.filter(
-    (m) => m.maintenanceStatus !== "resolved",
-  );
-  const unreadNotifications = mockNotifications.filter((n) => !n.read);
+  const { user } = useAuth()
+  
+  const [reservations, setReservations] = useState<ReservationResponse[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [averageRating, setAverageRating] = useState(0)
+  const [totalRatings, setTotalRatings] = useState(0)
+  const [activeReservationsCount, setActiveReservationsCount] = useState(0)
+  const [contractsCount, setContractsCount] = useState(0)
+  const [maintenanceCount, setMaintenanceCount] = useState(0)
+  const [recentNotifications, setRecentNotifications] = useState<NotificationResponse[]>([])
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0)
+
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      if (!user) return
+      setIsLoading(true)
+      try {
+        const [reservationsRes, ratingsRes, activeRes, contractsRes, maintenanceRes, notificationsRes, unreadCountRes] = await Promise.all([
+          reservationService.getMyReservations(0, 10),
+          ratingService.getByUser(user.id),
+          reservationService.getMyReservations(0, 1, undefined, undefined, "ACTIVE"),
+          contractService.getMyContracts(),
+          maintenanceService.getAll(0, 1),
+          notificationService.getNotifications(false, 0, 3, "createdAt", "desc"),
+          notificationService.getUnreadCount(),
+        ])
+        setReservations(reservationsRes.data || [])
+        setAverageRating(ratingsRes.data?.averageScore ?? 0)
+        setTotalRatings(ratingsRes.data?.totalRatings ?? 0)
+        setActiveReservationsCount(activeRes.pagination?.totalItems ?? 0)
+        setContractsCount(contractsRes.data?.length ?? 0)
+        setMaintenanceCount(maintenanceRes.pagination?.totalItems ?? 0)
+        setRecentNotifications(notificationsRes.data || [])
+        setUnreadNotificationsCount(unreadCountRes.data || 0)
+      } catch (error) {
+        console.error("Error cargando dashboard:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchDashboardData()
+
+    const handleNotificationsUpdated = () => { fetchDashboardData() }
+    window.addEventListener("notifications-updated", handleNotificationsUpdated)
+    return () => { window.removeEventListener("notifications-updated", handleNotificationsUpdated) }
+  }, [user])
+
+  const activeReservations = reservations.filter(
+    r => r.reservationStatus === 'ACTIVE' || r.reservationStatus === 'RESERVED'
+  )
+
 
   return (
     <div className="space-y-6">
       {/* Welcome Section */}
       <div className="rounded-xl bg-gradient-to-r from-primary/10 to-secondary p-6">
         <h1 className="text-2xl font-bold text-foreground">
-          Bienvenido, {user?.name?.split(" ")[0]}
+          Bienvenido, {user?.name?.split(' ')[0] || "Inquilino"}
         </h1>
         <p className="mt-1 text-muted-foreground">
           Aquí tienes un resumen de tu actividad en RentFlow
@@ -64,32 +129,37 @@ export default function TenantDashboard() {
 
       {/* Stats Grid */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Reservas Activas (Conectado) */}
         <Card>
           <CardContent className="flex items-center gap-4 p-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
               <CalendarDays className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{activeReservations.length}</p>
+              <p className="text-2xl font-bold">
+                {isLoading ? <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /> : activeReservationsCount}
+              </p>
               <p className="text-sm text-muted-foreground">Reservas Activas</p>
             </div>
           </CardContent>
         </Card>
 
+        {/* Contratos */}
         <Card>
           <CardContent className="flex items-center gap-4 p-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-amber-100">
               <FileText className="h-6 w-6 text-amber-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{pendingContracts.length}</p>
-              <p className="text-sm text-muted-foreground">
-                Contratos Pendientes
+              <p className="text-2xl font-bold">
+                {isLoading ? <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /> : contractsCount}
               </p>
+              <p className="text-sm text-muted-foreground">Contratos</p>
             </div>
           </CardContent>
         </Card>
 
+        {/* Mantenimientos */}
         <Card>
           <CardContent className="flex items-center gap-4 p-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-orange-100">
@@ -97,22 +167,33 @@ export default function TenantDashboard() {
             </div>
             <div>
               <p className="text-2xl font-bold">
-                {activeMaintenanceRequests.length}
+                {isLoading ? <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /> : maintenanceCount}
               </p>
               <p className="text-sm text-muted-foreground">Mantenimientos</p>
             </div>
           </CardContent>
         </Card>
 
+        {/* Calificación */}
         <Card>
           <CardContent className="flex items-center gap-4 p-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green-100">
-              <Star className="h-6 w-6 text-green-600" />
+              <Star className="h-6 w-6 text-green-600 fill-green-600" />
             </div>
             <div>
-              {/* TODO: Replace withactual rating data */}
-              <p className="text-2xl font-bold">-</p>
-              <p className="text-sm text-muted-foreground">Mi Calificación</p>
+              <div className="flex items-center gap-2">
+                <p className="text-2xl font-bold">
+                  {isLoading
+                    ? "—"
+                    : averageRating.toFixed(1)}
+                </p>
+                <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {totalRatings > 0
+                  ? `${totalRatings} calificaciones recibidas`
+                  : "Sin calificaciones"}
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -120,7 +201,12 @@ export default function TenantDashboard() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Upcoming Reservations */}
-        <Card>
+        <Card className="relative">
+          {isLoading && (
+            <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10 rounded-xl">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          )}
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-lg">Próximas Reservas</CardTitle>
             <Link href="/tenant/reservas">
@@ -130,12 +216,10 @@ export default function TenantDashboard() {
             </Link>
           </CardHeader>
           <CardContent className="space-y-4">
-            {activeReservations.length === 0 ? (
+            {activeReservations.length === 0 && !isLoading ? (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <Home className="mb-3 h-12 w-12 text-muted-foreground/50" />
-                <p className="text-muted-foreground">
-                  No tienes reservas activas
-                </p>
+                <p className="text-muted-foreground">No tienes reservas activas</p>
                 <Link href="/tenant/propiedades">
                   <Button className="mt-3" size="sm">
                     Buscar Propiedades
@@ -143,52 +227,41 @@ export default function TenantDashboard() {
                 </Link>
               </div>
             ) : (
-              activeReservations.map((reservation) => (
-                <div
-                  key={reservation.id}
-                  className="flex items-start gap-4 rounded-lg border border-border p-4"
-                >
-                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-secondary">
-                    <Home className="h-6 w-6 text-primary" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between gap-2">
-                      <h4 className="font-medium">
-                        {reservation.property.title}
-                      </h4>
-                      <Badge
-                        className={statusColors[reservation.reservationStatus]}
-                      >
-                        {statusLabels[reservation.reservationStatus]}
-                      </Badge>
+              activeReservations.slice(0, 4).map((reservation) => {
+                const statusConfig = getStatusBadgeConfig(reservation.reservationStatus);
+                
+                return (
+                  <div
+                    key={reservation.id}
+                    className="flex items-start gap-4 rounded-lg border border-border p-4"
+                  >
+                    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-secondary shrink-0">
+                      <Home className="h-6 w-6 text-primary" />
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      {reservation.property.city},{" "}
-                      {reservation.property.department}
-                    </p>
-                    <div className="mt-2 flex items-center gap-4 text-sm text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-4 w-4" />
-                        {new Date(reservation.checkInDate).toLocaleDateString(
-                          "es-ES",
-                          {
-                            day: "numeric",
-                            month: "short",
-                          },
-                        )}{" "}
-                        -{" "}
-                        {new Date(reservation.checkOutDate).toLocaleDateString(
-                          "es-ES",
-                          {
-                            day: "numeric",
-                            month: "short",
-                          },
-                        )}
-                      </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <h4 className="font-medium truncate">{reservation.propertyName}</h4>
+                        <Badge className={statusConfig.className}>
+                          {statusConfig.label}
+                        </Badge>
+                      </div>
+                      
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {(reservation as any).propertyCity && (reservation as any).propertyDepartment 
+                          ? `${(reservation as any).propertyCity}, ${(reservation as any).propertyDepartment}`
+                          : "Ubicación no disponible"}
+                      </p>
+
+                      <div className="mt-2 flex items-center text-sm text-muted-foreground">
+                        <span className="flex items-center gap-1.5">
+                          <Clock className="h-4 w-4" />
+                          {formatShortDate(reservation.checkInDate)} - {formatShortDate(reservation.checkOutDate)}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))
+                )
+              })
             )}
           </CardContent>
         </Card>
@@ -202,37 +275,25 @@ export default function TenantDashboard() {
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-3">
               <Link href="/tenant/propiedades">
-                <Button
-                  variant="outline"
-                  className="h-auto w-full flex-col gap-2 py-4"
-                >
+                <Button variant="outline" className="h-auto w-full flex-col gap-2 py-4">
                   <Home className="h-5 w-5 text-primary" />
                   <span className="text-xs">Buscar Propiedad</span>
                 </Button>
               </Link>
               <Link href="/tenant/contratos">
-                <Button
-                  variant="outline"
-                  className="h-auto w-full flex-col gap-2 py-4"
-                >
+                <Button variant="outline" className="h-auto w-full flex-col gap-2 py-4">
                   <FileText className="h-5 w-5 text-primary" />
                   <span className="text-xs">Firmar Contrato</span>
                 </Button>
               </Link>
               <Link href="/tenant/mantenimiento">
-                <Button
-                  variant="outline"
-                  className="h-auto w-full flex-col gap-2 py-4"
-                >
+                <Button variant="outline" className="h-auto w-full flex-col gap-2 py-4">
                   <Wrench className="h-5 w-5 text-primary" />
                   <span className="text-xs">Reportar Problema</span>
                 </Button>
               </Link>
               <Link href="/tenant/acceso">
-                <Button
-                  variant="outline"
-                  className="h-auto w-full flex-col gap-2 py-4"
-                >
+                <Button variant="outline" className="h-auto w-full flex-col gap-2 py-4">
                   <Key className="h-5 w-5 text-primary" />
                   <span className="text-xs">Ver Código</span>
                 </Button>
@@ -240,44 +301,68 @@ export default function TenantDashboard() {
             </CardContent>
           </Card>
 
-          {/* Recent Notifications */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg">
-                Notificaciones Recientes
-              </CardTitle>
-              {unreadNotifications.length > 0 && (
-                <Badge variant="secondary">
-                  {unreadNotifications.length} nuevas
-                </Badge>
-              )}
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {mockNotifications.slice(0, 3).map((notif) => (
-                <div
-                  key={notif.id}
-                  className="flex items-start gap-3 rounded-lg border border-border p-3"
-                >
-                  {!notif.read && (
-                    <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" />
-                  )}
-                  <div className={!notif.read ? "" : "ml-4"}>
-                    <p className="text-sm font-medium">{notif.title}</p>
-                    <p className="text-xs text-muted-foreground line-clamp-1">
-                      {notif.message}
-                    </p>
-                  </div>
-                </div>
-              ))}
-              <Link href="/tenant/notificaciones">
-                <Button variant="ghost" className="w-full text-primary">
-                  Ver todas las notificaciones
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
+            {/* Recent Notifications */}
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle className="text-lg">Notificaciones Recientes</CardTitle>
+
+                    {unreadNotificationsCount > 0 && (
+                        <Badge variant="secondary">
+                            {unreadNotificationsCount} nueva
+                            {unreadNotificationsCount > 1 ? "s" : ""}
+                        </Badge>
+                    )}
+                </CardHeader>
+
+                <CardContent className="space-y-3">
+                    {isLoading ? (
+                        <div className="flex justify-center py-6">
+                            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                        </div>
+                    ) : recentNotifications.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center rounded-lg border bg-muted/20 py-6 text-center">
+                            <Bell className="mb-2 h-8 w-8 text-muted-foreground/50" />
+                            <p className="text-sm font-medium text-muted-foreground">
+                                Sin notificaciones recientes
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                                Las notificaciones aparecerán aquí
+                            </p>
+                        </div>
+                    ) : (
+                        recentNotifications.map((notification) => (
+                            <div
+                                key={notification.id}
+                                className="rounded-lg border border-border p-3"
+                            >
+                                <div className="flex items-start gap-2">
+                                    {!notification.isRead && (
+                                        <span className="mt-2 h-2 w-2 rounded-full bg-primary" />
+                                    )}
+
+                                    <div className="min-w-0 flex-1">
+                                        <p className="line-clamp-1 text-sm font-medium">
+                                            {displayNotificationTitle(notification.title)}
+                                        </p>
+
+                                        <p className="line-clamp-2 text-xs text-muted-foreground">
+                                            {displayNotificationMessage(notification.message)}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    )}
+
+                    <Link href="/tenant/notificaciones">
+                        <Button variant="ghost" className="w-full text-primary">
+                            Ver todas las notificaciones
+                        </Button>
+                    </Link>
+                </CardContent>
+            </Card>
         </div>
       </div>
     </div>
-  );
+  )
 }
