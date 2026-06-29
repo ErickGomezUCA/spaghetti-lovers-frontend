@@ -323,8 +323,6 @@ export default function FinesPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="CARD">Tarjeta de Crédito/Débito</SelectItem>
-                    <SelectItem value="TRANSFER">Transferencia Bancaria</SelectItem>
-                    <SelectItem value="BANK_DEPOSIT">Depósito Bancario</SelectItem>
                     <SelectItem value="CASH">Efectivo</SelectItem>
                   </SelectContent>
                 </Select>

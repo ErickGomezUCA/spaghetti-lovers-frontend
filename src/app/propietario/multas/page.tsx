@@ -329,13 +329,17 @@ export default function LandlordFinesPage() {
                   <SelectValue placeholder="Selecciona la reserva..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {reservationsForSelect.map(r => (
-                    <SelectItem key={r.id} value={r.id}>
-                      RES-{r.id.split('-')[0].toUpperCase()} - {r.tenantName} ({r.propertyName})
+                  {reservationsForSelect
+                    .filter(r => r.reservationStatus === 'ACTIVE')
+                    .map(r => (
+                      <SelectItem key={r.id} value={r.id}>
+                        RES-{r.id.split('-')[0].toUpperCase()} - {r.tenantName} ({r.propertyName})
+                      </SelectItem>
+                    ))}
+                  {reservationsForSelect.filter(r => r.reservationStatus === 'ACTIVE').length === 0 && (
+                    <SelectItem value="empty" disabled>
+                      {reservationsForSelect.length === 0 ? 'Cargando reservas...' : 'No hay reservas activas'}
                     </SelectItem>
-                  ))}
-                  {reservationsForSelect.length === 0 && (
-                    <SelectItem value="empty" disabled>Cargando reservas...</SelectItem>
                   )}
                 </SelectContent>
               </Select>
@@ -358,9 +362,11 @@ export default function LandlordFinesPage() {
 
             <div className="space-y-2">
               <Label>Monto (USD)</Label>
-              <Input 
-                type="number" 
-                placeholder="0.00" 
+              <Input
+                type="number"
+                placeholder="0.00"
+                min="0.01"
+                step="0.01"
                 value={newFine.amount}
                 onChange={(e) => setNewFine({...newFine, amount: e.target.value})}
               />
