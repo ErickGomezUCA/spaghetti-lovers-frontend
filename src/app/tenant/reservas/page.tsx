@@ -803,9 +803,6 @@ export default function ReservationsPage() {
                         <SelectItem value="CARD">
                           Tarjeta de Crédito/Débito
                         </SelectItem>
-                        <SelectItem value="TRANSFER">
-                          Transferencia Bancaria
-                        </SelectItem>
                         <SelectItem value="CASH">Efectivo</SelectItem>
                       </SelectContent>
                     </Select>
