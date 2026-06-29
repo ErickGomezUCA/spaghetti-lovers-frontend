@@ -63,7 +63,7 @@ export default function LandlordFinesPage() {
     try {
       const res = await fineService.getLandlordFines(currentPage, pageSize, typeFilter, statusFilter, searchTerm)
       setFines(res.data || [])
-      setPaginationInfo(res.pagination || res.paginationMeta || null)
+      setPaginationInfo(res.pagination || null)
     } catch (error) {
       console.error('Error cargando multas:', error)
     } finally {
