@@ -179,6 +179,7 @@ export type ReservationResponse = {
   propertyId?: string;
   tenantId?: string;
   propertyName: string;
+  propertyImage: string | null;
   tenantName: string;
   tenantEmail: string;
   landlordName: string;
@@ -453,3 +454,19 @@ export type FineSummaryStatsResponse = {
   pendingAmount: number;
   resolvedAmount: number;
 };
+
+export type DocumentStatus = "PENDING" | "VERIFIED" | "REJECTED";
+
+export type IdentityDocumentResponse = {
+  id: string;
+  userId: string;
+  documentUrl: string;
+  documentStatus: DocumentStatus;
+  userName?: string;
+  userEmail?: string;
+  userRole?: string;
+  submittedAt?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  rejectionReason?: string;
+}

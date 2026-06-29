@@ -22,23 +22,19 @@ import {
 import { userService } from "@/lib/services/user.service";
 import { propertyService } from "@/lib/services/property.service";
 import { adminService } from "@/lib/services/admin.service";
-import { AdminMonthlySummary } from "@/types/api-responses";
+import { identityDocumentService } from "@/lib/services/identity-document.service";
+import { maintenanceService } from "@/lib/services/maintenance.service";
+import {
+  AdminMonthlySummary,
+  MaintenanceResponse,
+} from "@/types/api-responses";
 
-// TODO: pending verifications
-const pendingVerifications: {
+interface PendingVerification {
   id: string;
   user: string;
   type: string;
   submittedAt: string;
-}[] = [];
-
-// TODO: critical maintenance
-const criticalMaintenance: {
-  id: string;
-  property: string;
-  issue: string;
-  reportedAt: string;
-}[] = [];
+}
 
 const quickActions = [
   {
@@ -59,6 +55,15 @@ export default function AdminDashboard() {
   const [monthly, setMonthly] = useState<AdminMonthlySummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+  const [criticalMaintenances, setCriticalMaintenances] = useState<
+    MaintenanceResponse[]
+  >([]);
+
+  // Nuevo estado para las verificaciones pendientes
+  const [pendingVerifications, setPendingVerifications] = useState<
+    PendingVerification[]
+  >([]);
+  const [isVerificationsLoading, setIsVerificationsLoading] = useState(true);
 
   const fetchUnreadNotificationsCount = async () => {
     try {
@@ -90,22 +95,66 @@ export default function AdminDashboard() {
         setTenantCount(tenants);
         setActiveProperties(activePropCount);
 
-        const monthlyRes = await adminService.getMonthlySummary(activePropCount);
+        const monthlyRes =
+          await adminService.getMonthlySummary(activePropCount);
         setMonthly(monthlyRes.data);
+
+        const maintRes = await maintenanceService.getAll(0, 50);
+        const critical = (maintRes.data || []).filter(
+          (m) => m.urgency === "CRITICAL" && m.maintenanceStatus !== "RESOLVED",
+        );
+        setCriticalMaintenances(critical);
       } catch (error) {
         console.error("Error cargando stats del admin:", error);
       } finally {
         setIsLoading(false);
       }
     };
+
+    const fetchPendingVerifications = async () => {
+      setIsVerificationsLoading(true);
+      try {
+        const res = await identityDocumentService.getAllDocuments("PENDING");
+        if (res.data) {
+          const formatted = res.data.map((doc) => ({
+            id: doc.id,
+            user: doc.userName || doc.userEmail || "Usuario Desconocido",
+            type:
+              doc.userRole === "LANDLORD" || doc.userRole === "ROLE_LANDLORD"
+                ? "Propietario"
+                : "Inquilino",
+            submittedAt: doc.submittedAt
+              ? new Date(doc.submittedAt).toLocaleDateString()
+              : "Recientemente",
+          }));
+          setPendingVerifications(formatted.slice(0, 3));
+        }
+      } catch (error) {
+        console.error("Error cargando verificaciones pendientes:", error);
+      } finally {
+        setIsVerificationsLoading(false);
+      }
+    };
+
     fetchStats();
+    fetchPendingVerifications();
   }, []);
 
   useEffect(() => {
     fetchUnreadNotificationsCount();
-    const handleNotificationsUpdated = () => { fetchUnreadNotificationsCount(); };
-    window.addEventListener("notifications-updated", handleNotificationsUpdated);
-    return () => { window.removeEventListener("notifications-updated", handleNotificationsUpdated); };
+    const handleNotificationsUpdated = () => {
+      fetchUnreadNotificationsCount();
+    };
+    window.addEventListener(
+      "notifications-updated",
+      handleNotificationsUpdated,
+    );
+    return () => {
+      window.removeEventListener(
+        "notifications-updated",
+        handleNotificationsUpdated,
+      );
+    };
   }, []);
 
   const statCards = [
@@ -137,12 +186,35 @@ export default function AdminDashboard() {
     },
   ];
 
-  const colorClasses: Record<string, { bg: string; text: string; iconBg: string; border: string }> = {
-  primary: { bg: "bg-primary/10", text: "text-primary", iconBg: "bg-primary/10", border: "border-t-primary" },
-  green:   { bg: "bg-green-50",   text: "text-green-600", iconBg: "bg-green-100", border: "border-t-green-500" },
-  blue:    { bg: "bg-blue-50",    text: "text-blue-600",  iconBg: "bg-blue-100",  border: "border-t-blue-500" },
-  orange:  { bg: "bg-orange-50",  text: "text-orange-600", iconBg: "bg-orange-100", border: "border-t-orange-500" },
-};
+  const colorClasses: Record<
+    string,
+    { bg: string; text: string; iconBg: string; border: string }
+  > = {
+    primary: {
+      bg: "bg-primary/10",
+      text: "text-primary",
+      iconBg: "bg-primary/10",
+      border: "border-t-primary",
+    },
+    green: {
+      bg: "bg-green-50",
+      text: "text-green-600",
+      iconBg: "bg-green-100",
+      border: "border-t-green-500",
+    },
+    blue: {
+      bg: "bg-blue-50",
+      text: "text-blue-600",
+      iconBg: "bg-blue-100",
+      border: "border-t-blue-500",
+    },
+    orange: {
+      bg: "bg-orange-50",
+      text: "text-orange-600",
+      iconBg: "bg-orange-100",
+      border: "border-t-orange-500",
+    },
+  };
 
   return (
     <div className="space-y-8">
@@ -227,10 +299,18 @@ export default function AdminDashboard() {
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
-            {pendingVerifications.length === 0 ? (
-              <div className="text-center py-6 text-sm text-muted-foreground">
-                {/* TODO: wire to GET /api/identity-documents?status=PENDING (gap 1C) */}
-                Pendiente de conexión
+            {isVerificationsLoading ? (
+              <div className="flex justify-center py-6">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : pendingVerifications.length === 0 ? (
+              <div className="text-center py-8">
+                <div className="p-3 bg-green-100 rounded-full w-fit mx-auto mb-3">
+                  <UserCheck className="w-8 h-8 text-green-500" />
+                </div>
+                <p className="text-muted-foreground">
+                  No hay verificaciones pendientes
+                </p>
               </div>
             ) : (
               pendingVerifications.map((verification) => (
@@ -253,12 +333,16 @@ export default function AdminDashboard() {
                     <p className="text-xs text-muted-foreground mb-2">
                       {verification.submittedAt}
                     </p>
-                    <Button
-                      size="sm"
-                      className="bg-primary hover:bg-primary/90 h-8"
+                    <Link
+                      href={`/admin/verificaciones?search=${verification.id.split("-")[0]}`}
                     >
-                      Revisar
-                    </Button>
+                      <Button
+                        size="sm"
+                        className="bg-primary hover:bg-primary/90 h-8"
+                      >
+                        Revisar
+                      </Button>
+                    </Link>
                   </div>
                 </div>
               ))
@@ -285,9 +369,9 @@ export default function AdminDashboard() {
             </div>
           </CardHeader>
           <CardContent>
-            {criticalMaintenance.length > 0 ? (
+            {criticalMaintenances.length > 0 ? (
               <div className="space-y-3">
-                {criticalMaintenance.map((maintenance) => (
+                {criticalMaintenances.slice(0, 2).map((maintenance) => (
                   <div
                     key={maintenance.id}
                     className="p-4 bg-red-50 border border-red-100 rounded-xl"
@@ -297,20 +381,35 @@ export default function AdminDashboard() {
                         <AlertTriangle className="w-4 h-4 text-red-600" />
                       </div>
                       <span className="font-medium text-foreground">
-                        {maintenance.property}
+                        {maintenance.title}
                       </span>
                     </div>
-                    <p className="text-sm text-red-700 ml-11">
-                      {maintenance.issue}
-                    </p>
+                    {maintenance.description && (
+                      <p className="text-sm text-red-700 ml-11">
+                        {maintenance.description}
+                      </p>
+                    )}
                     <div className="flex items-center gap-1 mt-2 ml-11">
                       <Clock className="w-3 h-3 text-red-500" />
                       <p className="text-xs text-red-500">
-                        {maintenance.reportedAt}
+                        {maintenance.maintenanceStatus === "SCHEDULED"
+                          ? "Programado"
+                          : "En resolución"}
                       </p>
                     </div>
                   </div>
                 ))}
+                {criticalMaintenances.length > 2 && (
+                  <Link href="/admin/mantenimiento">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                    >
+                      +{criticalMaintenances.length - 2} más
+                    </Button>
+                  </Link>
+                )}
               </div>
             ) : (
               <div className="text-center py-8">
