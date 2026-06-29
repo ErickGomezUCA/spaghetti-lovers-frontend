@@ -137,27 +137,12 @@ export default function AdminDashboard() {
     },
   ];
 
-  const colorClasses: Record<
-    string,
-    { bg: string; text: string; iconBg: string }
-  > = {
-    primary: {
-      bg: "bg-primary/10",
-      text: "text-primary",
-      iconBg: "bg-primary/10",
-    },
-    green: {
-      bg: "bg-green-50",
-      text: "text-green-600",
-      iconBg: "bg-green-100",
-    },
-    blue: { bg: "bg-blue-50", text: "text-blue-600", iconBg: "bg-blue-100" },
-    orange: {
-      bg: "bg-orange-50",
-      text: "text-orange-600",
-      iconBg: "bg-orange-100",
-    },
-  };
+  const colorClasses: Record<string, { bg: string; text: string; iconBg: string; border: string }> = {
+  primary: { bg: "bg-primary/10", text: "text-primary", iconBg: "bg-primary/10", border: "border-t-primary" },
+  green:   { bg: "bg-green-50",   text: "text-green-600", iconBg: "bg-green-100", border: "border-t-green-500" },
+  blue:    { bg: "bg-blue-50",    text: "text-blue-600",  iconBg: "bg-blue-100",  border: "border-t-blue-500" },
+  orange:  { bg: "bg-orange-50",  text: "text-orange-600", iconBg: "bg-orange-100", border: "border-t-orange-500" },
+};
 
   return (
     <div className="space-y-8">
@@ -192,7 +177,7 @@ export default function AdminDashboard() {
         {statCards.map((stat, index) => (
           <Card
             key={index}
-            className="border hover:shadow-md transition-shadow"
+            className={`border-t-4 ${colorClasses[stat.color].border} hover:shadow-md transition-shadow`}
           >
             <CardContent className="p-6">
               <div className="flex items-center gap-4">

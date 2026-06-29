@@ -136,7 +136,7 @@ export default function AdminPropertiesPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-t-4 border-t-green-500">
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
               <div>
@@ -150,7 +150,7 @@ export default function AdminPropertiesPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-t-4 border-t-blue-500">
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
               <div>
@@ -164,7 +164,7 @@ export default function AdminPropertiesPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-t-4 border-t-orange-500">
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
               <div>
