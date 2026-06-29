@@ -57,6 +57,7 @@ import { propertyService } from "@/lib/services/property.service";
 import { userService } from "@/lib/services/user.service";
 import { reservationService } from "@/lib/services/reservation.service";
 import { Property, PropertyType } from "@/types/api-responses";
+import { StripeCardStep } from "@/components/dialogs/StripeCardStep";
 
 const propertyTypeOptions: { value: PropertyType | "all"; label: string }[] = [
   { value: "all", label: "Todos los tipos" },
@@ -116,6 +117,10 @@ export default function PropertiesPage() {
 
   const [isBooking, setIsBooking] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+
+  const [isStripeStep, setIsStripeStep] = useState(false);
+  const [stripePaymentId, setStripePaymentId] = useState<string | null>(null);
+  const [stripePaymentAmount, setStripePaymentAmount] = useState(0);
 
   const [debouncedTerm, setDebouncedTerm] = useState("");
 
@@ -185,24 +190,38 @@ export default function PropertiesPage() {
 
   const handleConfirmBooking = async () => {
     if (!bookingProperty || !dateRange.from || !dateRange.to) return;
-    
+
     setBookingError(null);
     setIsBooking(true);
     try {
       const checkInDate = format(dateRange.from, 'yyyy-MM-dd');
       const checkOutDate = format(dateRange.to, 'yyyy-MM-dd');
 
-      await reservationService.createReservation({
+      const res = await reservationService.createReservation({
         propertyId: bookingProperty.id,
         checkInDate,
         checkOutDate,
         guestsCount: parseInt(bookingGuests),
-        paymentMethod: paymentMethod 
+        paymentMethod: paymentMethod,
       });
 
-      setShowBookingDialog(false);
-      setShowSuccessDialog(true);
-      
+      if (paymentMethod === "CARD") {
+        const detail = await reservationService.getLandlordReservationDetail(res.data.id);
+        const reservationPayment = detail.data.payments?.find(
+          (p) => p.paymentType === "RESERVATION"
+        );
+        if (reservationPayment) {
+          setStripePaymentId(reservationPayment.id);
+          setStripePaymentAmount(reservationPayment.amount);
+          setIsStripeStep(true);
+        } else {
+          setShowBookingDialog(false);
+          setShowSuccessDialog(true);
+        }
+      } else {
+        setShowBookingDialog(false);
+        setShowSuccessDialog(true);
+      }
     } catch (error: any) {
       console.error("Error al crear la reserva:", error);
       const translatedMsg = translateApiError(error.message);
@@ -210,6 +229,12 @@ export default function PropertiesPage() {
     } finally {
       setIsBooking(false);
     }
+  };
+
+  const resetStripeStep = () => {
+    setIsStripeStep(false);
+    setStripePaymentId(null);
+    setStripePaymentAmount(0);
   };
 
   return (
@@ -457,16 +482,30 @@ export default function PropertiesPage() {
       <Dialog open={showBookingDialog} onOpenChange={(open) => {
         setShowBookingDialog(open);
         if (!open) {
-           setDateRange({ from: undefined, to: undefined });
-           setBookingError(null);
+          setDateRange({ from: undefined, to: undefined });
+          setBookingError(null);
+          resetStripeStep();
         }
       }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Crear Reserva</DialogTitle>
+            <DialogTitle>{isStripeStep ? "Pago con Tarjeta" : "Crear Reserva"}</DialogTitle>
             <DialogDescription>{bookingProperty?.title}</DialogDescription>
           </DialogHeader>
           
+          {isStripeStep && stripePaymentId ? (
+            <StripeCardStep
+              paymentId={stripePaymentId}
+              amount={stripePaymentAmount}
+              onSuccess={() => {
+                resetStripeStep();
+                setShowBookingDialog(false);
+                setShowSuccessDialog(true);
+              }}
+              onBack={resetStripeStep}
+            />
+          ) : (
+          <>
           {bookingError && (
             <div className="rounded-lg bg-red-50 border border-red-200 p-3 flex items-start gap-3 mb-2">
               <AlertTriangle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
@@ -630,7 +669,7 @@ export default function PropertiesPage() {
             >
               Cancelar
             </Button>
-            <Button 
+            <Button
               className="h-11"
               disabled={!dateRange.from || !dateRange.to || isBooking || dateRange.from.getTime() === dateRange.to.getTime()}
               onClick={handleConfirmBooking}
@@ -645,6 +684,8 @@ export default function PropertiesPage() {
               )}
             </Button>
           </DialogFooter>
+          </>
+          )}
         </DialogContent>
       </Dialog>
 

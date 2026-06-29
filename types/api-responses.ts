@@ -232,6 +232,7 @@ export type ReservationDetailResponse = {
     securityDepositAmount: number;
     mainPhotoUrl: string;
   };
+  payments?: PaymentResponse[];
 };
 
 export type PaymentResponse = {
@@ -242,6 +243,14 @@ export type PaymentResponse = {
   refundAmount: number;
   createdAt: string;
   refundedAt?: string;
+  stripePaymentIntentId?: string;
+};
+
+export type StripePaymentIntentResponse = {
+  clientSecret: string;
+  paymentIntentId: string;
+  amount: number;
+  currency: string;
 };
 
 export type ReservationExtensionResponse = {
