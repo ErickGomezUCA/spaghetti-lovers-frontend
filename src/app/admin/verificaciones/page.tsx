@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useState, useEffect, useCallback } from "react"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -40,112 +40,96 @@ import {
   User,
   Calendar,
   AlertTriangle,
+  Loader2
 } from "lucide-react"
 
-// Mock data
-const verifications = [
-  {
-    id: "VER-001",
-    userId: "USR-003",
-    userName: "Carlos Mendoza",
-    userEmail: "carlos.mendoza@email.com",
-    userRole: "Landlord",
-    documentUrl: "/documents/dui-carlos.pdf",
-    status: "pending",
-    submittedAt: "2024-06-18T10:30:00",
-    reviewedBy: null,
-    reviewedAt: null,
-    rejectionReason: null,
-  },
-  {
-    id: "VER-002",
-    userId: "USR-006",
-    userName: "Laura Sánchez",
-    userEmail: "laura.sanchez@email.com",
-    userRole: "Tenant",
-    documentUrl: "/documents/dui-laura.pdf",
-    status: "pending",
-    submittedAt: "2024-06-17T15:45:00",
-    reviewedBy: null,
-    reviewedAt: null,
-    rejectionReason: null,
-  },
-  {
-    id: "VER-003",
-    userId: "USR-007",
-    userName: "Pedro Hernández",
-    userEmail: "pedro.hernandez@email.com",
-    userRole: "Landlord",
-    documentUrl: "/documents/dui-pedro.pdf",
-    status: "pending",
-    submittedAt: "2024-06-16T09:00:00",
-    reviewedBy: null,
-    reviewedAt: null,
-    rejectionReason: null,
-  },
-  {
-    id: "VER-004",
-    userId: "USR-001",
-    userName: "Juan Carlos Rodríguez",
-    userEmail: "juan.rodriguez@email.com",
-    userRole: "Landlord",
-    documentUrl: "/documents/dui-juan.pdf",
-    status: "verified",
-    submittedAt: "2023-06-15T14:00:00",
-    reviewedBy: "Admin Pedro",
-    reviewedAt: "2023-06-16T10:00:00",
-    rejectionReason: null,
-  },
-  {
-    id: "VER-005",
-    userId: "USR-004",
-    userName: "Ana Martínez",
-    userEmail: "ana.martinez@email.com",
-    userRole: "Tenant",
-    documentUrl: "/documents/dui-ana.pdf",
-    status: "rejected",
-    submittedAt: "2024-02-15T11:30:00",
-    reviewedBy: "Admin Pedro",
-    reviewedAt: "2024-02-16T09:00:00",
-    rejectionReason: "Documento ilegible. Por favor, suba una imagen más clara.",
-  },
-]
+import { identityDocumentService } from "@/lib/services/identity-document.service"
+import { DocumentStatus, IdentityDocumentResponse } from "@/types/api-responses"
 
-const statusColors: Record<string, string> = {
-  pending: "bg-yellow-100 text-yellow-700 border-yellow-200",
-  verified: "bg-green-100 text-green-700 border-green-200",
-  rejected: "bg-red-100 text-red-700 border-red-200",
+const statusColors: Record<DocumentStatus, string> = {
+  PENDING: "bg-yellow-100 text-yellow-700 border-yellow-200",
+  VERIFIED: "bg-green-100 text-green-700 border-green-200",
+  REJECTED: "bg-red-100 text-red-700 border-red-200",
 }
 
-const statusLabels: Record<string, string> = {
-  pending: "Pendiente",
-  verified: "Verificado",
-  rejected: "Rechazado",
+const statusLabels: Record<DocumentStatus, string> = {
+  PENDING: "Pendiente",
+  VERIFIED: "Verificado",
+  REJECTED: "Rechazado",
 }
 
-const statusIcons: Record<string, React.ReactNode> = {
-  pending: <Clock className="w-4 h-4" />,
-  verified: <CheckCircle className="w-4 h-4" />,
-  rejected: <XCircle className="w-4 h-4" />,
+const statusIcons: Record<DocumentStatus, React.ReactNode> = {
+  PENDING: <Clock className="w-4 h-4" />,
+  VERIFIED: <CheckCircle className="w-4 h-4" />,
+  REJECTED: <XCircle className="w-4 h-4" />,
 }
 
 export default function VerificationsPage() {
+  const [documents, setDocuments] = useState<IdentityDocumentResponse[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isProcessing, setIsProcessing] = useState(false)
+  
   const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [selectedVerification, setSelectedVerification] = useState<typeof verifications[0] | null>(null)
+  const [statusFilter, setStatusFilter] = useState("ALL")
+  
+  const [selectedDoc, setSelectedDoc] = useState<IdentityDocumentResponse | null>(null)
   const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false)
   const [rejectionReason, setRejectionReason] = useState("")
 
-  const filteredVerifications = verifications.filter((v) => {
-    const matchesSearch =
-      v.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      v.userEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      v.id.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = statusFilter === "all" || v.status === statusFilter
-    return matchesSearch && matchesStatus
-  })
+  const fetchDocuments = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const res = await identityDocumentService.getAllDocuments(statusFilter)
+      setDocuments(res.data || [])
+    } catch (error) {
+      console.error("Error fetching documents:", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [statusFilter])
 
-  const pendingCount = verifications.filter((v) => v.status === "pending").length
+  useEffect(() => {
+    fetchDocuments()
+  }, [fetchDocuments])
+
+const filteredDocs = documents
+    .filter((doc) => {
+      if (!searchTerm) return true
+      const term = searchTerm.toLowerCase()
+      return (
+        doc.userName?.toLowerCase().includes(term) ||
+        doc.userEmail?.toLowerCase().includes(term) ||
+        doc.id.toLowerCase().includes(term)
+      )
+    })
+    .sort((a, b) => {
+      const dateA = a.submittedAt ? new Date(a.submittedAt).getTime() : 0;
+      const dateB = b.submittedAt ? new Date(b.submittedAt).getTime() : 0;
+      
+      return dateB - dateA;
+    });
+
+  const pendingCount = documents.filter((d) => d.documentStatus === "PENDING").length
+
+  const handleReviewAction = async (documentId: string, newStatus: DocumentStatus) => {
+    if (newStatus === "REJECTED" && !rejectionReason.trim()) {
+      alert("Por favor ingresa un motivo de rechazo.");
+      return;
+    }
+
+    setIsProcessing(true)
+    try {
+      await identityDocumentService.reviewDocument(documentId, newStatus, rejectionReason);
+      setIsReviewDialogOpen(false)
+      setRejectionReason("")
+      setSelectedDoc(null)
+      fetchDocuments()
+    } catch (error) {
+      console.error(`Error updating document to ${newStatus}:`, error)
+    } finally {
+      setIsProcessing(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -158,7 +142,7 @@ export default function VerificationsPage() {
       </div>
 
       {/* Pending Alert */}
-      {pendingCount > 0 && (
+      {pendingCount > 0 && !isLoading && (
         <Card className="border-l-4 border-l-yellow-500 bg-yellow-50">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -181,7 +165,9 @@ export default function VerificationsPage() {
         <Card className="border-t-4 border-t-yellow-500">
           <CardContent className="p-4 text-center">
             <Clock className="w-6 h-6 text-yellow-600 mx-auto mb-2" />
-            <p className="text-2xl font-semibold text-yellow-600">{pendingCount}</p>
+            <p className="text-2xl font-semibold text-yellow-600">
+              {isLoading ? <Loader2 className="w-5 h-5 mx-auto animate-spin" /> : pendingCount}
+            </p>
             <p className="text-sm text-muted-foreground">Pendientes</p>
           </CardContent>
         </Card>
@@ -189,7 +175,7 @@ export default function VerificationsPage() {
           <CardContent className="p-4 text-center">
             <CheckCircle className="w-6 h-6 text-green-600 mx-auto mb-2" />
             <p className="text-2xl font-semibold text-green-600">
-              {verifications.filter((v) => v.status === "verified").length}
+              {isLoading ? <Loader2 className="w-5 h-5 mx-auto animate-spin" /> : documents.filter((v) => v.documentStatus === "VERIFIED").length}
             </p>
             <p className="text-sm text-muted-foreground">Verificados</p>
           </CardContent>
@@ -198,7 +184,7 @@ export default function VerificationsPage() {
           <CardContent className="p-4 text-center">
             <XCircle className="w-6 h-6 text-red-600 mx-auto mb-2" />
             <p className="text-2xl font-semibold text-red-600">
-              {verifications.filter((v) => v.status === "rejected").length}
+              {isLoading ? <Loader2 className="w-5 h-5 mx-auto animate-spin" /> : documents.filter((v) => v.documentStatus === "REJECTED").length}
             </p>
             <p className="text-sm text-muted-foreground">Rechazados</p>
           </CardContent>
@@ -206,7 +192,9 @@ export default function VerificationsPage() {
         <Card className="border-t-4 border-t-blue-500">
           <CardContent className="p-4 text-center">
             <FileCheck className="w-6 h-6 text-blue-600 mx-auto mb-2" />
-            <p className="text-2xl font-semibold text-blue-600">{verifications.length}</p>
+            <p className="text-2xl font-semibold text-blue-600">
+              {isLoading ? <Loader2 className="w-5 h-5 mx-auto animate-spin" /> : documents.length}
+            </p>
             <p className="text-sm text-muted-foreground">Total</p>
           </CardContent>
         </Card>
@@ -230,10 +218,10 @@ export default function VerificationsPage() {
                 <SelectValue placeholder="Estado" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos los estados</SelectItem>
-                <SelectItem value="pending">Pendientes</SelectItem>
-                <SelectItem value="verified">Verificados</SelectItem>
-                <SelectItem value="rejected">Rechazados</SelectItem>
+                <SelectItem value="ALL">Todos los estados</SelectItem>
+                <SelectItem value="PENDING">Pendientes</SelectItem>
+                <SelectItem value="VERIFIED">Verificados</SelectItem>
+                <SelectItem value="REJECTED">Rechazados</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -243,163 +231,199 @@ export default function VerificationsPage() {
       {/* Verifications Table */}
       <Card className="border-t-4 border-t-primary">
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>ID</TableHead>
-                <TableHead>Usuario</TableHead>
-                <TableHead>Rol</TableHead>
-                <TableHead>Fecha Envío</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>Revisado por</TableHead>
-                <TableHead>Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredVerifications.map((verification) => (
-                <TableRow key={verification.id}>
-                  <TableCell className="font-medium">{verification.id}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                        <User className="w-5 h-5 text-primary" />
-                      </div>
-                      <div>
-                        <p className="font-medium">{verification.userName}</p>
-                        <p className="text-xs text-muted-foreground">{verification.userEmail}</p>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">
-                      {verification.userRole === "Landlord" ? "Propietario" : "Inquilino"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1 text-sm">
-                      <Calendar className="w-3 h-3" />
-                      {new Date(verification.submittedAt).toLocaleDateString()}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={statusColors[verification.status]}>
-                      <span className="flex items-center gap-1">
-                        {statusIcons[verification.status]}
-                        {statusLabels[verification.status]}
-                      </span>
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {verification.reviewedBy ? (
-                      <div className="text-sm">
-                        <p>{verification.reviewedBy}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {verification.reviewedAt ? new Date(verification.reviewedAt).toLocaleDateString() : ""}
-                        </p>
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground">-</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Dialog open={isReviewDialogOpen && selectedVerification?.id === verification.id} onOpenChange={setIsReviewDialogOpen}>
-                        <DialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              setSelectedVerification(verification)
-                              setIsReviewDialogOpen(true)
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>ID</TableHead>
+                  <TableHead>Usuario</TableHead>
+                  <TableHead>Rol</TableHead>
+                  <TableHead>Fecha Envío</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead>Revisado por</TableHead>
+                  <TableHead className="text-center">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-12">
+                      <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
+                    </TableCell>
+                  </TableRow>
+                ) : filteredDocs.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                      No se encontraron documentos.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredDocs.map((doc) => (
+                    <TableRow key={doc.id}>
+                      <TableCell className="font-medium">
+                        {doc.id.split("-")[0].toUpperCase()}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
+                            <User className="w-5 h-5 text-primary" />
+                          </div>
+                          <div>
+                            <p className="font-medium">{doc.userName || "Usuario Desconocido"}</p>
+                            <p className="text-xs text-muted-foreground">{doc.userEmail || doc.userId}</p>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">
+                          {doc.userRole === "LANDLORD" || doc.userRole === "ROLE_LANDLORD" ? "Propietario" : 
+                           doc.userRole === "TENANT" || doc.userRole === "ROLE_TENANT" ? "Inquilino" : "Usuario"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1 text-sm">
+                          <Calendar className="w-3 h-3" />
+                          {doc.submittedAt ? new Date(doc.submittedAt).toLocaleDateString() : "N/A"}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={`${statusColors[doc.documentStatus]} border-none hover:${statusColors[doc.documentStatus]}`}>
+                          <span className="flex items-center gap-1">
+                            {statusIcons[doc.documentStatus]}
+                            {statusLabels[doc.documentStatus]}
+                          </span>
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {doc.reviewedBy ? (
+                          <div className="text-sm">
+                            <p>{doc.reviewedBy}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {doc.reviewedAt ? new Date(doc.reviewedAt).toLocaleDateString() : ""}
+                            </p>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center justify-center gap-2">
+                          <Dialog 
+                            open={isReviewDialogOpen && selectedDoc?.id === doc.id} 
+                            onOpenChange={(open) => {
+                              setIsReviewDialogOpen(open);
+                              if (!open) { setRejectionReason(""); setSelectedDoc(null); }
                             }}
                           >
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-2xl">
-                          <DialogHeader>
-                            <DialogTitle>Revisar Verificación {verification.id}</DialogTitle>
-                          </DialogHeader>
-                          <div className="space-y-6">
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <p className="text-sm text-muted-foreground">Usuario</p>
-                                <p className="font-medium">{verification.userName}</p>
-                                <p className="text-sm text-muted-foreground">{verification.userEmail}</p>
-                              </div>
-                              <div>
-                                <p className="text-sm text-muted-foreground">Rol</p>
-                                <p className="font-medium">
-                                  {verification.userRole === "Landlord" ? "Propietario" : "Inquilino"}
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="border rounded-lg p-4 bg-muted/50">
-                              <div className="flex items-center justify-between mb-4">
-                                <h4 className="font-semibold">Documento de Identidad</h4>
-                                <Button variant="outline" size="sm">
-                                  <Download className="w-4 h-4 mr-2" />
-                                  Descargar
-                                </Button>
-                              </div>
-                              <div className="h-64 bg-gray-200 rounded-lg flex items-center justify-center">
-                                <FileCheck className="w-16 h-16 text-gray-400" />
-                              </div>
-                            </div>
-
-                            {verification.status === "pending" && (
-                              <div className="space-y-4">
-                                <div className="space-y-2">
-                                  <Label className="text-xs uppercase text-muted-foreground font-medium">
-                                    Motivo de rechazo (si aplica)
-                                  </Label>
-                                  <Textarea
-                                    placeholder="Ingresa el motivo si vas a rechazar el documento..."
-                                    value={rejectionReason}
-                                    onChange={(e) => setRejectionReason(e.target.value)}
-                                    rows={3}
-                                    className="bg-input"
-                                  />
+                            <DialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  setSelectedDoc(doc)
+                                  setIsReviewDialogOpen(true)
+                                }}
+                              >
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-2xl">
+                              <DialogHeader>
+                                <DialogTitle>Revisar Verificación de {doc.userName || "Usuario"}</DialogTitle>
+                              </DialogHeader>
+                              <div className="space-y-6">
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                    <p className="text-sm text-muted-foreground">Usuario</p>
+                                    <p className="font-medium">{doc.userName}</p>
+                                    <p className="text-sm text-muted-foreground">{doc.userEmail}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm text-muted-foreground">Estado Actual</p>
+                                    <Badge className={`${statusColors[doc.documentStatus]} border-none mt-1`}>
+                                      {statusLabels[doc.documentStatus]}
+                                    </Badge>
+                                  </div>
                                 </div>
-                                <div className="flex gap-2">
-                                  <Button className="flex-1 bg-green-600 hover:bg-green-700">
-                                    <CheckCircle className="w-4 h-4 mr-2" />
-                                    Aprobar
-                                  </Button>
-                                  <Button variant="destructive" className="flex-1">
-                                    <XCircle className="w-4 h-4 mr-2" />
-                                    Rechazar
-                                  </Button>
-                                </div>
-                              </div>
-                            )}
 
-                            {verification.status === "rejected" && verification.rejectionReason && (
-                              <div className="p-4 bg-red-50 border border-red-100 rounded-lg">
-                                <p className="font-medium text-red-800 mb-1">Motivo de rechazo:</p>
-                                <p className="text-sm text-red-700">{verification.rejectionReason}</p>
+                                <div className="border rounded-lg p-4 bg-muted/50">
+                                  <div className="flex items-center justify-between mb-4">
+                                    <h4 className="font-semibold">Documento de Identidad</h4>
+                                    <Button variant="outline" size="sm" onClick={() => window.open(doc.documentUrl, '_blank')}>
+                                      <Download className="w-4 h-4 mr-2" />
+                                      Ver original
+                                    </Button>
+                                  </div>
+                                  <div className="h-64 bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden relative">
+                                    {doc.documentUrl ? (
+                                      <img 
+                                        src={doc.documentUrl} 
+                                        alt="Documento de identidad" 
+                                        className="w-full h-full object-contain"
+                                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                      />
+                                    ) : (
+                                      <FileCheck className="w-16 h-16 text-gray-400" />
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Controles de Aprobación/Rechazo (Solo si está pendiente) */}
+                                {doc.documentStatus === "PENDING" && (
+                                  <div className="space-y-4 border-t pt-4">
+                                    <div className="space-y-2">
+                                      <Label className="text-xs uppercase text-muted-foreground font-medium">
+                                        Motivo de rechazo (obligatorio si se rechaza)
+                                      </Label>
+                                      <Textarea
+                                        placeholder="Ingresa el motivo si el documento no es válido..."
+                                        value={rejectionReason}
+                                        onChange={(e) => setRejectionReason(e.target.value)}
+                                        rows={2}
+                                        className="bg-background"
+                                        disabled={isProcessing}
+                                      />
+                                    </div>
+                                    <div className="flex gap-3 pt-2">
+                                      <Button 
+                                        className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                                        onClick={() => handleReviewAction(doc.id, "VERIFIED")}
+                                        disabled={isProcessing}
+                                      >
+                                        {isProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin"/> : <CheckCircle className="w-4 h-4 mr-2" />}
+                                        Aprobar Documento
+                                      </Button>
+                                      <Button 
+                                        variant="destructive" 
+                                        className="flex-1"
+                                        onClick={() => handleReviewAction(doc.id, "REJECTED")}
+                                        disabled={isProcessing || !rejectionReason.trim()}
+                                      >
+                                        {isProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin"/> : <XCircle className="w-4 h-4 mr-2" />}
+                                        Rechazar
+                                      </Button>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Motivo de rechazo visible si ya fue rechazado */}
+                                {doc.documentStatus === "REJECTED" && doc.rejectionReason && (
+                                  <div className="p-4 bg-red-50 border border-red-100 rounded-lg">
+                                    <p className="font-medium text-red-800 mb-1">Motivo de rechazo:</p>
+                                    <p className="text-sm text-red-700">{doc.rejectionReason}</p>
+                                  </div>
+                                )}
                               </div>
-                            )}
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                      {verification.status === "pending" && (
-                        <>
-                          <Button size="sm" className="bg-green-600 hover:bg-green-700">
-                            <CheckCircle className="w-4 h-4" />
-                          </Button>
-                          <Button size="sm" variant="destructive">
-                            <XCircle className="w-4 h-4" />
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                            </DialogContent>
+                          </Dialog>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

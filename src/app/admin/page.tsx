@@ -22,15 +22,15 @@ import {
 import { userService } from "@/lib/services/user.service";
 import { propertyService } from "@/lib/services/property.service";
 import { adminService } from "@/lib/services/admin.service";
+import { identityDocumentService } from "@/lib/services/identity-document.service";
 import { AdminMonthlySummary } from "@/types/api-responses";
 
-// TODO: pending verifications
-const pendingVerifications: {
+interface PendingVerification {
   id: string;
   user: string;
-  type: string;
+  type: string; 
   submittedAt: string;
-}[] = [];
+}
 
 // TODO: critical maintenance
 const criticalMaintenance: {
@@ -59,6 +59,10 @@ export default function AdminDashboard() {
   const [monthly, setMonthly] = useState<AdminMonthlySummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+
+  // Nuevo estado para las verificaciones pendientes
+  const [pendingVerifications, setPendingVerifications] = useState<PendingVerification[]>([]);
+  const [isVerificationsLoading, setIsVerificationsLoading] = useState(true);
 
   const fetchUnreadNotificationsCount = async () => {
     try {
@@ -98,7 +102,29 @@ export default function AdminDashboard() {
         setIsLoading(false);
       }
     };
+    
+    const fetchPendingVerifications = async () => {
+      setIsVerificationsLoading(true);
+      try {
+        const res = await identityDocumentService.getAllDocuments("PENDING");
+        if (res.data) {
+          const formatted = res.data.map(doc => ({
+            id: doc.id,
+            user: doc.userName || doc.userEmail || "Usuario Desconocido",
+            type: doc.userRole === "LANDLORD" || doc.userRole === "ROLE_LANDLORD" ? "Propietario" : "Inquilino",
+            submittedAt: doc.submittedAt ? new Date(doc.submittedAt).toLocaleDateString() : "Recientemente"
+          }));
+          setPendingVerifications(formatted.slice(0, 3));
+        }
+      } catch (error) {
+        console.error("Error cargando verificaciones pendientes:", error);
+      } finally {
+        setIsVerificationsLoading(false);
+      }
+    };
+
     fetchStats();
+    fetchPendingVerifications();
   }, []);
 
   useEffect(() => {
@@ -242,10 +268,18 @@ export default function AdminDashboard() {
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
-            {pendingVerifications.length === 0 ? (
-              <div className="text-center py-6 text-sm text-muted-foreground">
-                {/* TODO: wire to GET /api/identity-documents?status=PENDING (gap 1C) */}
-                Pendiente de conexión
+            {isVerificationsLoading ? (
+              <div className="flex justify-center py-6">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : pendingVerifications.length === 0 ? (
+              <div className="text-center py-8">
+                <div className="p-3 bg-green-100 rounded-full w-fit mx-auto mb-3">
+                  <UserCheck className="w-8 h-8 text-green-500" />
+                </div>
+                <p className="text-muted-foreground">
+                  No hay verificaciones pendientes
+                </p>
               </div>
             ) : (
               pendingVerifications.map((verification) => (
@@ -268,12 +302,14 @@ export default function AdminDashboard() {
                     <p className="text-xs text-muted-foreground mb-2">
                       {verification.submittedAt}
                     </p>
-                    <Button
-                      size="sm"
-                      className="bg-primary hover:bg-primary/90 h-8"
-                    >
-                      Revisar
-                    </Button>
+                    <Link href={`/admin/verificaciones?search=${verification.id.split('-')[0]}`}>
+                      <Button
+                        size="sm"
+                        className="bg-primary hover:bg-primary/90 h-8"
+                      >
+                        Revisar
+                      </Button>
+                    </Link>
                   </div>
                 </div>
               ))
