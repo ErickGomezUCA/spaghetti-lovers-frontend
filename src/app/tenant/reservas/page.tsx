@@ -345,9 +345,9 @@ export default function ReservationsPage() {
       <Card className="overflow-hidden">
         <div className="flex flex-col md:flex-row">
           <div className="aspect-video w-full bg-muted/50 flex items-center justify-center border-r md:aspect-square md:w-56 shrink-0 overflow-hidden">
-            {(reservation as any).propertyImage && !imageError ? (
+            {reservation.propertyImage && !imageError ? (
               <img
-                src={(reservation as any).propertyImage}
+                src={reservation.propertyImage}
                 alt={reservation.propertyName}
                 className="h-full w-full object-cover"
                 onError={() => setImageError(true)}

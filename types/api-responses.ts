@@ -179,6 +179,7 @@ export type ReservationResponse = {
   propertyId?: string;
   tenantId?: string;
   propertyName: string;
+  propertyImage: string | null;
   tenantName: string;
   tenantEmail: string;
   landlordName: string;
