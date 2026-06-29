@@ -43,13 +43,15 @@ import { ContractDetailResponse, ContractStatus } from "@/types/api-responses"
 import { useAuth } from "@/lib/contexts/auth-context"
 
 const statusColors: Record<ContractStatus, string> = {
-  PENDING_SIGNATURES: "bg-yellow-100 text-yellow-700 border-yellow-200",
-  SIGNED: "bg-green-100 text-green-700 border-green-200",
+    PENDING_SIGNATURES: "bg-yellow-100 text-yellow-700 border-yellow-200",
+    SIGNED: "bg-green-100 text-green-700 border-green-200",
+    CANCELLED: "bg-red-100 text-red-700 border-red-200",
 }
 
 const statusLabels: Record<ContractStatus, string> = {
-  PENDING_SIGNATURES: "Pendiente de firma",
-  SIGNED: "Firmado",
+    PENDING_SIGNATURES: "Pendiente de firma",
+    SIGNED: "Firmado",
+    CANCELLED: "Cancelado",
 }
 
 function formatDate(dateStr: string) {
@@ -155,9 +157,10 @@ export default function ContractsPage() {
                 <SelectValue placeholder="Estado" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos los estados</SelectItem>
-                <SelectItem value="PENDING_SIGNATURES">Pendiente de firma</SelectItem>
-                <SelectItem value="SIGNED">Firmado</SelectItem>
+                  <SelectItem value="all">Todos los estados</SelectItem>
+                  <SelectItem value="PENDING_SIGNATURES">Pendiente de firma</SelectItem>
+                  <SelectItem value="SIGNED">Firmado</SelectItem>
+                  <SelectItem value="CANCELLED">Cancelado</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -205,9 +208,11 @@ export default function ContractsPage() {
                       <Badge className={statusColors[contract.contractStatus]}>
                         <span className="flex items-center gap-1">
                           {contract.contractStatus === "SIGNED" ? (
-                            <CheckCircle className="w-3 h-3" />
+                              <CheckCircle className="w-3 h-3" />
+                          ) : contract.contractStatus === "CANCELLED" ? (
+                              <AlertCircle className="w-3 h-3" />
                           ) : (
-                            <Clock className="w-3 h-3" />
+                              <Clock className="w-3 h-3" />
                           )}
                           {statusLabels[contract.contractStatus]}
                         </span>
