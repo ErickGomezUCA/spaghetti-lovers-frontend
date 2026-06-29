@@ -84,7 +84,7 @@ export type UserProfileResponse = {
   verificationStatus: string | null;
 };
 
-export type ContractStatus = "SIGNED" | "PENDING_SIGNATURES";
+export type ContractStatus = "SIGNED" | "PENDING_SIGNATURES" | "CANCELLED";
 
 export type ContractDetailResponse = {
   id: string;

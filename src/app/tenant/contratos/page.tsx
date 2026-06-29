@@ -27,13 +27,15 @@ import { ContractDetailResponse } from '@/types/api-responses'
 import { useAuth } from '@/lib/contexts/auth-context'
 
 const statusColors = {
-  PENDING_SIGNATURES: 'bg-amber-100 text-amber-800',
-  SIGNED: 'bg-green-100 text-green-800',
+    PENDING_SIGNATURES: 'bg-amber-100 text-amber-800',
+    SIGNED: 'bg-green-100 text-green-800',
+    CANCELLED: 'bg-red-100 text-red-800',
 }
 
 const statusLabels = {
-  PENDING_SIGNATURES: 'Pendiente de Firmas',
-  SIGNED: 'Firmado',
+    PENDING_SIGNATURES: 'Pendiente de Firmas',
+    SIGNED: 'Firmado',
+    CANCELLED: 'Cancelado',
 }
 
 function formatDate(dateStr: string, options?: Intl.DateTimeFormatOptions) {
@@ -155,14 +157,28 @@ export default function ContractsPage() {
                       <Clock className="h-4 w-4 text-muted-foreground" />
                       <div>
                         <p className="text-xs text-muted-foreground">
-                          {contract.contractStatus === 'SIGNED' ? 'Firmado el' : 'Vence el'}
+                            {contract.contractStatus === 'SIGNED'
+                                ? 'Firmado el'
+                                : contract.contractStatus === 'CANCELLED'
+                                    ? 'Estado'
+                                    : 'Vence el'}
                         </p>
                         <p className={`font-medium ${isExpired(contract) && contract.contractStatus !== 'SIGNED' ? 'text-destructive' : ''}`}>
                           {contract.contractStatus === 'SIGNED'
-                            ? formatDate(contract.createdAtTimestamp!, { day: 'numeric', month: 'short', year: 'numeric' })
-                            : contract.expiresAtTimestamp
-                              ? formatDate(contract.expiresAtTimestamp, { day: 'numeric', month: 'short', year: 'numeric' })
-                              : '—'}
+                              ? formatDate(contract.createdAtTimestamp!, {
+                                  day: 'numeric',
+                                  month: 'short',
+                                  year: 'numeric',
+                              })
+                              : contract.contractStatus === 'CANCELLED'
+                                  ? 'Cancelado'
+                                  : contract.expiresAtTimestamp
+                                      ? formatDate(contract.expiresAtTimestamp, {
+                                          day: 'numeric',
+                                          month: 'short',
+                                          year: 'numeric',
+                                      })
+                                      : '—'}
                         </p>
                       </div>
                     </div>
