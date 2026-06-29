@@ -109,6 +109,7 @@ export default function PropertiesPage() {
   const [paymentMethod, setPaymentMethod] = useState("CARD");
   
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [pickingStart, setPickingStart] = useState(true);
   const [dateRange, setDateRange] = useState<{
     from: Date | undefined;
     to: Date | undefined;
@@ -519,7 +520,7 @@ export default function PropertiesPage() {
                 <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                   Fechas de Estadía
                 </Label>
-                <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                <Popover open={isCalendarOpen} onOpenChange={(open) => { if (open) setPickingStart(true); setIsCalendarOpen(open); }}>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
@@ -548,16 +549,22 @@ export default function PropertiesPage() {
                       initialFocus
                       mode="range"
                       defaultMonth={dateRange.from}
-                      selected={dateRange}
+                      selected={pickingStart ? undefined : { from: dateRange.from, to: undefined }}
                       onSelect={(range) => {
-                        setBookingError(null); 
-                        if (range?.from && range?.to && range.from.getTime() === range.to.getTime()) {
-                          setDateRange({ from: range.from, to: undefined });
+                        setBookingError(null);
+                        if (pickingStart) {
+                          setDateRange({ from: range?.from, to: undefined });
+                          setPickingStart(false);
                           return;
                         }
-                        setDateRange({ from: range?.from, to: range?.to });
-                        if (range?.from && range?.to && range.from.getTime() !== range.to.getTime()) {
+                        const clicked = range?.to ?? range?.from;
+                        if (clicked && dateRange.from) {
+                          if (clicked.getTime() === dateRange.from.getTime()) return;
+                          const newFrom = clicked < dateRange.from ? clicked : dateRange.from;
+                          const newTo = clicked < dateRange.from ? dateRange.from : clicked;
+                          setDateRange({ from: newFrom, to: newTo });
                           setIsCalendarOpen(false);
+                          setPickingStart(true);
                         }
                       }}
                       numberOfMonths={2}
