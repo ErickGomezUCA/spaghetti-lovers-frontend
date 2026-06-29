@@ -56,6 +56,7 @@ export default function NewPropertyPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [basePriceError, setBasePriceError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -117,6 +118,13 @@ export default function NewPropertyPage() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!formData.propertyType) return;
+
+    const price = parseFloat(formData.basePricePerNight);
+    if (!formData.basePricePerNight || isNaN(price) || price <= 0) {
+      setBasePriceError("El precio por noche debe ser mayor a $0.00.");
+      return;
+    }
+    setBasePriceError(null);
 
     setIsLoading(true);
     try {
@@ -229,7 +237,8 @@ export default function NewPropertyPage() {
                 htmlFor="description"
                 className="text-xs uppercase text-muted-foreground font-medium"
               >
-                Descripción
+                Descripción{" "}
+                <span className="normal-case font-normal">(Opcional)</span>
               </Label>
               <Textarea
                 id="description"
@@ -426,16 +435,20 @@ export default function NewPropertyPage() {
                 <Input
                   id="basePricePerNight"
                   type="number"
-                  min="0"
+                  min="0.01"
                   step="0.01"
                   placeholder="0.00"
                   value={formData.basePricePerNight}
-                  onChange={(e) =>
-                    handleInputChange("basePricePerNight", e.target.value)
-                  }
-                  className="bg-input"
+                  onChange={(e) => {
+                    handleInputChange("basePricePerNight", e.target.value);
+                    setBasePriceError(null);
+                  }}
+                  className={`bg-input${basePriceError ? " border-destructive" : ""}`}
                   required
                 />
+                {basePriceError && (
+                  <p className="text-xs text-destructive">{basePriceError}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label
@@ -561,7 +574,8 @@ export default function NewPropertyPage() {
                 htmlFor="rules"
                 className="text-xs uppercase text-muted-foreground font-medium"
               >
-                Reglas y Políticas
+                Reglas y Políticas{" "}
+                <span className="normal-case font-normal">(Opcional)</span>
               </Label>
               <Textarea
                 id="rules"

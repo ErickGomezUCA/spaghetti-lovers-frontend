@@ -33,6 +33,7 @@ import {
 } from 'lucide-react'
 import { maintenanceService } from '@/lib/services/maintenance.service'
 import { contractService } from '@/lib/services/contract.service'
+import { reservationService } from '@/lib/services/reservation.service'
 import { uploadService } from '@/lib/services/upload.service'
 import { useToast } from '@/hooks/use-toast'
 import { MaintenanceResponse, ContractDetailResponse, Urgency } from '@/types/api-responses'
@@ -67,6 +68,7 @@ export default function MaintenancePage() {
   const { toast } = useToast()
   const [maintenances, setMaintenances] = useState<MaintenanceResponse[]>([])
   const [contracts, setContracts] = useState<ContractDetailResponse[]>([])
+  const [activeReservationIds, setActiveReservationIds] = useState<Set<string>>(new Set())
   const [showNewRequestDialog, setShowNewRequestDialog] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [newRequest, setNewRequest] = useState({
@@ -82,6 +84,14 @@ export default function MaintenancePage() {
   useEffect(() => {
     maintenanceService.getAll().then((res) => setMaintenances(res.data)).catch(() => {})
     contractService.getMyContracts().then((res) => setContracts(res.data)).catch(() => {})
+    reservationService.getMyReservations(0, 100).then((res) => {
+      const ids = new Set(
+        (res.data || [])
+          .filter((r) => r.reservationStatus === 'ACTIVE' || r.reservationStatus === 'RESERVED')
+          .map((r) => r.id)
+      )
+      setActiveReservationIds(ids)
+    }).catch(() => {})
   }, [])
 
   const propertyByReservation = new Map(
@@ -294,7 +304,7 @@ export default function MaintenancePage() {
                       <SelectValue placeholder="Selecciona la propiedad" />
                     </SelectTrigger>
                     <SelectContent>
-                      {contracts.map((contract) => (
+                      {contracts.filter((c) => activeReservationIds.has(c.reservationId)).map((contract) => (
                         <SelectItem key={contract.reservationId} value={contract.reservationId}>
                           {contract.propertyTitle}
                         </SelectItem>

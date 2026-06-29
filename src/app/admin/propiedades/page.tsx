@@ -298,16 +298,6 @@ export default function AdminPropertiesPage() {
                             <Eye className="w-4 h-4 mr-2" />
                             Ver detalles
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            {/* TODO: Navigate to landlord user detail */}
-                            <User className="w-4 h-4 mr-2" />
-                            Ver propietario
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            {/* TODO: Navigate to reservations filtered by property */}
-                            <Calendar className="w-4 h-4 mr-2" />
-                            Ver reservas
-                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>

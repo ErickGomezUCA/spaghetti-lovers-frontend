@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { User, Building2, CheckCircle, ShieldAlert } from "lucide-react";
+import { User, Building2, CheckCircle, ShieldAlert, Lock, Eye, EyeOff } from "lucide-react";
 import { AuthPageShell } from "@/components/auth/auth-page-shell";
 import {
   validateRegistration,
@@ -24,6 +24,7 @@ export default function RegisterPage() {
     email: "",
     password: "",
   });
+  const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<ValidationError[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -219,18 +220,34 @@ export default function RegisterPage() {
             <label className="text-[11px] font-semibold tracking-widest uppercase text-muted-foreground">
               Contraseña de Acceso
             </label>
-            <input
-              type="password"
-              placeholder="Clave de seguridad"
-              value={formData.password}
-              onChange={handleInputChange("password")}
+            <div
               className={cn(
-                "w-full border rounded-lg px-3 py-2.5 text-sm bg-background text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors",
+                "flex items-center gap-2 border rounded-lg px-3 py-2.5 bg-background focus-within:border-primary transition-colors",
                 getFieldError("password")
                   ? "border-destructive"
                   : "border-border",
               )}
-            />
+            >
+              <Lock className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="Clave de seguridad"
+                value={formData.password}
+                onChange={handleInputChange("password")}
+                className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {showPassword ? (
+                  <EyeOff className="w-4 h-4" />
+                ) : (
+                  <Eye className="w-4 h-4" />
+                )}
+              </button>
+            </div>
             {getFieldError("password") && (
               <p className="text-xs text-destructive">
                 {getFieldError("password")}
