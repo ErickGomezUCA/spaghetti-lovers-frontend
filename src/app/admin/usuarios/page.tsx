@@ -141,7 +141,7 @@ export default function UsersPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="border hover:shadow-md transition-shadow">
+        <Card className="border-t-4 border-t-blue-500 hover:shadow-md transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
               <div className="p-3 bg-blue-100 rounded-xl">
@@ -158,7 +158,7 @@ export default function UsersPage() {
             </div>
           </CardContent>
         </Card>
-        <Card className="border hover:shadow-md transition-shadow">
+        <Card className="border-t-4 border-t-green-500 hover:shadow-md transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
               <div className="p-3 bg-green-100 rounded-xl">
@@ -175,7 +175,7 @@ export default function UsersPage() {
             </div>
           </CardContent>
         </Card>
-        <Card className="border hover:shadow-md transition-shadow">
+        <Card className="border-t-4 border-t-purple-500 hover:shadow-md transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
               <div className="p-3 bg-purple-100 rounded-xl">
@@ -192,7 +192,7 @@ export default function UsersPage() {
             </div>
           </CardContent>
         </Card>
-        <Card className="border hover:shadow-md transition-shadow">
+        <Card className="border-t-4 border-t-yellow-500 hover:shadow-md transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
               <div className="p-3 bg-yellow-100 rounded-xl">

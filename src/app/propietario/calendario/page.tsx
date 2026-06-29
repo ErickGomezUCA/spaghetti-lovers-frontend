@@ -282,39 +282,6 @@ export default function CalendarPage() {
         </Select>
       </div>
 
-      {/* Calendario */}
-      <Card className="border-t-4 border-t-primary">
-        <CardHeader className="flex flex-row items-center justify-between pb-4">
-          <div className="flex items-center gap-4">
-            <Button variant="outline" size="icon" onClick={goToPreviousMonth}>
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            <h2 className="text-xl font-semibold">
-              {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
-            </h2>
-            <Button variant="outline" size="icon" onClick={goToNextMonth}>
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </div>
-          {isLoading && (
-            <p className="text-sm text-muted-foreground">Cargando...</p>
-          )}
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-7 mb-2">
-            {dayNames.map((day) => (
-              <div
-                key={day}
-                className="text-center text-sm font-medium text-muted-foreground py-2"
-              >
-                {day}
-              </div>
-            ))}
-          </div>
-          <div className="grid grid-cols-7">{renderCalendarDays()}</div>
-        </CardContent>
-      </Card>
-
       {/* Leyenda y Eventos */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="border-t-4 border-t-primary">
@@ -374,6 +341,39 @@ export default function CalendarPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Calendario */}
+      <Card className="border-t-4 border-t-primary">
+        <CardHeader className="flex flex-row items-center justify-between pb-4">
+          <div className="flex items-center gap-4">
+            <Button variant="outline" size="icon" onClick={goToPreviousMonth}>
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <h2 className="text-xl font-semibold">
+              {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
+            </h2>
+            <Button variant="outline" size="icon" onClick={goToNextMonth}>
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+          {isLoading && (
+            <p className="text-sm text-muted-foreground">Cargando...</p>
+          )}
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-7 mb-2">
+            {dayNames.map((day) => (
+              <div
+                key={day}
+                className="text-center text-sm font-medium text-muted-foreground py-2"
+              >
+                {day}
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7">{renderCalendarDays()}</div>
+        </CardContent>
+      </Card>
 
       {/* Dialog */}
       <Dialog

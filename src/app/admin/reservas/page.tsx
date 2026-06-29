@@ -200,7 +200,7 @@ export default function AdminReservationsPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-t-4 border-t-green-500">
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
               <div>
@@ -214,7 +214,7 @@ export default function AdminReservationsPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-t-4 border-t-blue-500">
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
               <div>
@@ -228,7 +228,7 @@ export default function AdminReservationsPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-t-4 border-t-red-500">
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
               <div>
